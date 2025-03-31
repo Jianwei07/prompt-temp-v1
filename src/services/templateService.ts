@@ -19,7 +19,7 @@ let templates: Template[] = [
     version: "v1.2",
     lastUsed: "2 hours ago",
     collection: "Security",
-    updatedBy: "",
+    updatedBy: "J Chua",
   },
   {
     id: "2",
@@ -29,7 +29,7 @@ let templates: Template[] = [
     version: "v1.0",
     lastUsed: "5 hours ago",
     collection: "Favorites",
-    updatedBy: "",
+    updatedBy: "Jayden",
   },
   {
     id: "3",
@@ -39,7 +39,7 @@ let templates: Template[] = [
     version: "v1.0",
     lastUsed: "5 hours ago",
     collection: "Favorites",
-    updatedBy: "",
+    updatedBy: "BJ",
   },
   {
     id: "4",
@@ -49,7 +49,7 @@ let templates: Template[] = [
     version: "v1.0",
     lastUsed: "5 hours ago",
     collection: "Favorites",
-    updatedBy: "",
+    updatedBy: "Ami",
   },
   {
     id: "5",
@@ -59,7 +59,17 @@ let templates: Template[] = [
     version: "v1.0",
     lastUsed: "5 hours ago",
     collection: "HR",
-    updatedBy: "",
+    updatedBy: "Ervin",
+  },
+  {
+    id: "6",
+    departmentCodes: ["CCM"],
+    name: "Control Management",
+    content: "Standard responses for inquiries...",
+    version: "v1.0",
+    lastUsed: "5 hours ago",
+    collection: "CCM",
+    updatedBy: "Ervin",
   },
 ];
 
@@ -110,11 +120,30 @@ export const createTemplate = async (
 };
 
 // Mock data for UI (aligned with your Figma)
-export const getCollections = async (): Promise<Collection[]> => [
-  { name: "Favorites", count: 12 },
-  { name: "Security", count: 8 },
-  { name: "HR", count: 15 },
-];
+export const getCollections = async (): Promise<Collection[]> => {
+  // Create a map to count templates per collection
+  const collectionCounts = new Map<string, number>();
+  
+  // Count templates for each collection
+  templates.forEach(template => {
+    if (template.collection) {
+      collectionCounts.set(
+        template.collection,
+        (collectionCounts.get(template.collection) || 0) + 1
+      );
+    }
+  });
+
+  // Convert the map to array of Collection objects
+  const collections: Collection[] = Array.from(collectionCounts.entries()).map(
+    ([name, count]) => ({
+      name,
+      count
+    })
+  );
+
+  return collections;
+};
 
 export const getRecentActivities = async (): Promise<Activity[]> => [
   {

@@ -89,9 +89,19 @@ const Dashboard: React.FC = () => {
 
         {/* Templates Section */}
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h6" gutterBottom>
-            Recent Templates
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">
+              Available Templates
+            </Typography>
+            <Button
+              variant="contained"
+              component={Link}
+              to="/create-template"
+              size="medium"
+            >
+              Create New Template
+            </Button>
+          </Box>
           <Grid container spacing={2} sx={{ mb: 3 }}>
             {filteredTemplates.slice(0, 3).map((template) => (
               <Grid item xs={12} sm={6} md={4} key={template.id}>
@@ -149,14 +159,6 @@ const Dashboard: React.FC = () => {
           <Typography variant="h5" fontWeight="bold">
             Your Collections
           </Typography>
-          <Button
-            variant="contained"
-            component={Link}
-            to="/create-template"
-            size="medium"
-          >
-            Create New Template
-          </Button>
         </Box>
 
         <Grid container spacing={3} sx={{ mb: 6 }}>
