@@ -106,46 +106,84 @@ Created on: ${new Date().toISOString()}`;
   }
 });
 
-// server.js (or bitbucketService.js)
 app.get("/api/templates", async (req, res) => {
-  // Build the Bitbucket API URL to list files in the "templates/" folder
   const workspace = process.env.BITBUCKET_WORKSPACE;
   const repoSlug = process.env.BITBUCKET_REPO;
   const username = process.env.BITBUCKET_USERNAME;
   const appPassword = process.env.BITBUCKET_APP_PASSWORD;
 
+  if (!workspace || !repoSlug || !username || !appPassword) {
+    return res.status(500).json({
+      success: false,
+      error: "Bitbucket credentials are not set properly in the environment.",
+    });
+  }
+
   const auth = Buffer.from(`${username}:${appPassword}`).toString("base64");
-  const apiUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src?path=templates`;
+  const listUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src?path=templates`;
 
   try {
-    const response = await fetch(apiUrl, {
-      headers: {
-        Authorization: `Basic ${auth}`,
-      },
+    // Get the list of files in the templates folder
+    const listResponse = await fetch(listUrl, {
+      headers: { Authorization: `Basic ${auth}` },
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Bitbucket API error: ${errorText}`);
+    if (!listResponse.ok) {
+      const errorText = await listResponse.text();
+      console.error(
+        "Bitbucket API list error:",
+        listResponse.status,
+        errorText
+      );
+      return res.status(500).json({ error: errorText });
     }
+    const listData = await listResponse.json();
 
-    // The JSON includes a "values" array listing file info
-    const data = await response.json();
-
-    // data.values = array of file objects { path: "templates/as.md", ... }
-    // We'll build an array of template objects for the front-end
+    // For each file, fetch its content and parse metadata
     const templates = await Promise.all(
-      data.values.map(async (file) => {
-        // Optional: fetch each file’s content if you want to display more info
-        // or parse the front matter from the markdown
-        // For now, we just return minimal info
+      listData.values.map(async (file) => {
+        const filePath = file.path; // e.g., "templates/test_template.md"
+        const fileName =
+          filePath.split("/").pop()?.replace(".md", "") || "Unknown";
+
+        // Fetch file content
+        const contentUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src/main/${filePath}`;
+        const contentResponse = await fetch(contentUrl, {
+          headers: { Authorization: `Basic ${auth}` },
+        });
+        let content = "";
+        if (contentResponse.ok) {
+          content = await contentResponse.text();
+        }
+
+        // Parse metadata from markdown using regex
+        // Adjust these regexes based on how your markdown is formatted.
+        const deptRegex = /\*\*Department Codes:\*\*\s*(.*)/i;
+        const collRegex = /\*\*Collection:\*\*\s*(.*)/i;
+        let departmentCodes = [];
+        let collection = "";
+
+        const deptMatch = content.match(deptRegex);
+        if (deptMatch && deptMatch[1]) {
+          departmentCodes = deptMatch[1].split(",").map((s) => s.trim());
+        }
+        const collMatch = content.match(collRegex);
+        if (collMatch && collMatch[1]) {
+          collection = collMatch[1].trim();
+        }
+
+        // Return a template object; adjust fields as necessary
         return {
-          id: file.path, // e.g. "templates/as.md"
-          name: file.path.split("/").pop()?.replace(".md", ""), // "as"
-          content: "", // Fill later if needed
-          collection: "", // Fill from front matter or your own logic
-          departmentCodes: [], // Fill from front matter or your own logic
-          // ... other fields
+          id: filePath, // use file path as unique identifier
+          name: fileName,
+          content,
+          version: "N/A", // Optionally parse version info if included
+          departmentCodes,
+          collection,
+          lastUsed: "", // Can be set from commit data if needed
+          updatedBy: "",
+          createdAt: new Date(), // Placeholder; can be replaced with actual metadata
+          updatedAt: new Date(),
+          createdBy: "",
         };
       })
     );

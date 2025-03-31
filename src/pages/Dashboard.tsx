@@ -57,6 +57,7 @@ const Dashboard: React.FC = () => {
         const [collectionsRes, activitiesRes, templatesRes] = await Promise.all(
           [getCollections(), getRecentActivities(), getTemplates()]
         );
+        console.log("Fetched templates:", templatesRes); // Debug log
         setCollections(collectionsRes);
         setActivities(activitiesRes);
         setTemplates(templatesRes);

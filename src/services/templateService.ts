@@ -105,20 +105,13 @@ const logToBackend = async (log: ApiLog): Promise<void> => {
 export async function getTemplates(): Promise<Template[]> {
   const response = await fetch("http://localhost:4000/api/templates");
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Error fetching templates:", response.status, errorText);
     throw new Error("Failed to fetch templates from Bitbucket");
   }
   const data = await response.json();
-  // If the API returns an object with a 'templates' field, return that; otherwise, return data as-is.
-  return Array.isArray(data) ? data : data.templates || [];
-}
-
-// templateService.ts
-export async function fetchTemplatesFromBitbucket(): Promise<Template[]> {
-  const response = await fetch("http://localhost:4000/api/templates");
-  if (!response.ok) {
-    throw new Error("Failed to fetch templates from Bitbucket");
-  }
-  return response.json();
+  // If data is not an array, check if it's an object containing a 'values' property:
+  return Array.isArray(data) ? data : data.values || [];
 }
 
 export async function createTemplate(
