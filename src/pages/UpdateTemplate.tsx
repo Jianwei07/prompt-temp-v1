@@ -23,6 +23,7 @@ import {
   Checkbox,
   ListItem,
   OutlinedInput,
+  Autocomplete,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -118,11 +119,17 @@ const UpdateTemplate: React.FC = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleDepartmentChange = (event: any) => {
-    const value = event.target.value;
+  const handleDepartmentChange = (event: any, newValue: string[]) => {
     setFormData((prev) => ({
       ...prev,
-      departmentCodes: typeof value === "string" ? value.split(",") : value,
+      departmentCodes: newValue,
+    }));
+  };
+
+  const handleCollectionChange = (event: any, newValue: string | null) => {
+    setFormData((prev) => ({
+      ...prev,
+      collection: newValue || "",
     }));
   };
 
@@ -211,48 +218,48 @@ const UpdateTemplate: React.FC = () => {
                   disabled={isLoading}
                 />
 
-                <FormControl fullWidth sx={{ mt: 2, mb: 2 }}>
-                  <InputLabel>Department Codes</InputLabel>
-                  <Select
-                    multiple
-                    value={formData.departmentCodes}
-                    onChange={handleDepartmentChange}
-                    input={<OutlinedInput label="Department Codes" />}
-                    renderValue={(selected) => (
-                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                        {selected.map((value) => (
-                          <Chip key={value} label={value} />
-                        ))}
-                      </Box>
-                    )}
-                  >
-                    {departmentOptions.map((code) => (
-                      <MenuItem key={code} value={code}>
-                        <Checkbox
-                          checked={formData.departmentCodes.includes(code)}
-                        />
-                        <ListItemText primary={code} />
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Autocomplete
+                  multiple
+                  freeSolo
+                  options={departmentOptions}
+                  value={formData.departmentCodes}
+                  onChange={handleDepartmentChange}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Department Codes"
+                      placeholder="Type or select"
+                      margin="normal"
+                      fullWidth
+                    />
+                  )}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                      <Chip
+                        label={option}
+                        {...getTagProps({ index })}
+                      />
+                    ))
+                  }
+                  sx={{ mt: 2, mb: 2 }}
+                />
 
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                  <InputLabel>Collection</InputLabel>
-                  <Select
-                    value={formData.collection}
-                    onChange={(e) =>
-                      setFormData({ ...formData, collection: e.target.value })
-                    }
-                    label="Collection"
-                  >
-                    {collectionOptions.map((collection) => (
-                      <MenuItem key={collection} value={collection}>
-                        {collection}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Autocomplete
+                  freeSolo
+                  options={collectionOptions}
+                  value={formData.collection}
+                  onChange={handleCollectionChange}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Collection"
+                      placeholder="Type or select"
+                      margin="normal"
+                      fullWidth
+                    />
+                  )}
+                  sx={{ mb: 2 }}
+                />
 
                 <Box display="flex" justifyContent="space-between" mt={3}>
                   <Button

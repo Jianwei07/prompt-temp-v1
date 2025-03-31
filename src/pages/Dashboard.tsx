@@ -131,7 +131,12 @@ const Dashboard: React.FC = () => {
                     >
                       Edit
                     </Button>
-                    <Button size="small">View</Button>
+                    <Button 
+                      size="small" 
+                      component={Link}
+                      to={`/view-template/${template.id}`}>
+                      View
+                    </Button>
                   </CardActions>
                 </Card>
               </Grid>
