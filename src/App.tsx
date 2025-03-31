@@ -4,7 +4,7 @@ import Dashboard from "./pages/Dashboard";
 import CreateTemplate from "./pages/CreateTemplate";
 import EditTemplate from "./pages/UpdateTemplate";
 import ViewTemplate from "./pages/ViewTemplate";
-import Templates from "./pages/TemplatesPage";
+import CollectionDetail from "./pages/CollectionDetail"; // new page to view templates for a specific collection
 import Support from "./pages/Support";
 import "./styles/global.css";
 
@@ -13,12 +13,14 @@ const App: React.FC = () => {
     <Router>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/templates" element={<Templates />} />
-        <Route path="/templates/:collection?" element={<Templates />} />
         <Route path="/create-template" element={<CreateTemplate />} />
         <Route path="/edit-template/:id" element={<EditTemplate />} />
         <Route path="/view-template/:id" element={<ViewTemplate />} />
         <Route path="/support" element={<Support />} />
+        <Route
+          path="/collections/:collectionName"
+          element={<CollectionDetail />}
+        />
       </Routes>
     </Router>
   );

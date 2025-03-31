@@ -21,8 +21,8 @@ let templates: Template[] = [
     lastUsed: "2 hours ago",
     collection: "Security",
     updatedBy: "J Chua",
-    createdAt: new Date(2025, 1, 30, 14, 58), 
-    updatedAt: new Date(2025, 1, 31, 14, 58), 
+    createdAt: new Date(2025, 1, 30, 14, 58),
+    updatedAt: new Date(2025, 1, 31, 14, 58),
     createdBy: "J Chua",
   },
   {
@@ -34,8 +34,8 @@ let templates: Template[] = [
     lastUsed: "5 hours ago",
     collection: "Favorites",
     updatedBy: "J Chua",
-    createdAt: new Date(2025, 1, 30, 14, 58), 
-    updatedAt: new Date(NaN), 
+    createdAt: new Date(2025, 1, 30, 14, 58),
+    updatedAt: new Date(NaN),
     createdBy: "",
   },
   {
@@ -47,8 +47,8 @@ let templates: Template[] = [
     lastUsed: "5 hours ago",
     collection: "Favorites",
     updatedBy: "J Chua",
-    createdAt: new Date(2025, 2, 3, 14, 58), 
-    updatedAt: new Date(2025, 2, 4, 14, 58), 
+    createdAt: new Date(2025, 2, 3, 14, 58),
+    updatedAt: new Date(2025, 2, 4, 14, 58),
     createdBy: "J Chua",
   },
   {
@@ -60,8 +60,8 @@ let templates: Template[] = [
     lastUsed: "5 hours ago",
     collection: "Favorites",
     updatedBy: "J Chua",
-    createdAt: new Date(2025, 3, 30, 14, 58), 
-    updatedAt: new Date(2025, 3, 31, 14, 58), 
+    createdAt: new Date(2025, 3, 30, 14, 58),
+    updatedAt: new Date(2025, 3, 31, 14, 58),
     createdBy: "J Chua",
   },
   {
@@ -73,8 +73,8 @@ let templates: Template[] = [
     lastUsed: "5 hours ago",
     collection: "HR",
     updatedBy: "J Chua",
-    createdAt: new Date(2025, 2, 10, 14, 58), 
-    updatedAt: new Date(2025, 2, 12, 14, 58), 
+    createdAt: new Date(2025, 2, 10, 14, 58),
+    updatedAt: new Date(2025, 2, 12, 14, 58),
     createdBy: "J Chua",
   },
   {
@@ -86,8 +86,8 @@ let templates: Template[] = [
     lastUsed: "5 hours ago",
     collection: "CCM",
     updatedBy: "J Chua",
-    createdAt: new Date(2025, 3, 10, 14, 58), 
-    updatedAt: new Date(2025, 3, 11, 14, 58), 
+    createdAt: new Date(2025, 3, 10, 14, 58),
+    updatedAt: new Date(2025, 3, 11, 14, 58),
     createdBy: "J Chua",
   },
 ];
@@ -102,52 +102,79 @@ const logToBackend = async (log: ApiLog): Promise<void> => {
   // });
 };
 
-// Basic CRUD operations
-export const getTemplates = async (): Promise<Template[]> => {
-  await logToBackend({
-    endpoint: "/templates",
-    method: "GET",
-    payload: {},
-    timestamp: new Date().toISOString(),
-  });
-  return [...templates];
-};
+export async function getTemplates(): Promise<Template[]> {
+  const response = await fetch("http://localhost:4000/api/templates");
+  if (!response.ok) {
+    throw new Error("Failed to fetch templates from Bitbucket");
+  }
+  const data = await response.json();
+  // If the API returns an object with a 'templates' field, return that; otherwise, return data as-is.
+  return Array.isArray(data) ? data : data.templates || [];
+}
 
-export const createTemplate = async (
+// templateService.ts
+export async function fetchTemplatesFromBitbucket(): Promise<Template[]> {
+  const response = await fetch("http://localhost:4000/api/templates");
+  if (!response.ok) {
+    throw new Error("Failed to fetch templates from Bitbucket");
+  }
+  return response.json();
+}
+
+export async function createTemplate(
   data: CreateTemplateData
-): Promise<Template> => {
-  const newTemplate = {
+): Promise<Template> {
+  const response = await fetch("http://localhost:4000/api/templates", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  // If the response is not OK, try to get the error text and throw an error.
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("CreateTemplate error:", response.status, errorText);
+    throw new Error("Failed to create template");
+  }
+
+  // Get the response text
+  const responseText = await response.text();
+  let result: { filePath?: string } = {};
+  if (responseText && responseText.trim().length > 0) {
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.warn("Response is not valid JSON. Proceeding with empty result.");
+    }
+  } else {
+    console.warn("Response body is empty. Proceeding with empty result.");
+  }
+
+  console.log("Template created. File stored at:", result.filePath);
+
+  // Simulate returning a new template object based on the input.
+  const newTemplate: Template = {
     id: Date.now().toString(),
     name: data.name,
     content: data.content || "",
     version: "v1.0",
     lastUsed: "Just now",
-    departmentCodes: [],
-    createdAt: new Date(), 
-    createdBy: "BJ",
-    updatedAt: new Date(NaN), 
+    departmentCodes: data.departmentCodes,
+    createdAt: new Date(),
+    createdBy: "Test User",
+    updatedAt: new Date(NaN),
     updatedBy: "",
   };
-
-  templates.push(newTemplate);
-
-  await logToBackend({
-    endpoint: "/templates",
-    method: "POST",
-    payload: data,
-    timestamp: new Date().toISOString(),
-  });
-
   return newTemplate;
-};
+}
 
 // Mock data for UI (aligned with your Figma)
 export const getCollections = async (): Promise<Collection[]> => {
   // Create a map to count templates per collection
   const collectionCounts = new Map<string, number>();
-  
+
   // Count templates for each collection
-  templates.forEach(template => {
+  templates.forEach((template) => {
     if (template.collection) {
       collectionCounts.set(
         template.collection,
@@ -160,7 +187,7 @@ export const getCollections = async (): Promise<Collection[]> => {
   const collections: Collection[] = Array.from(collectionCounts.entries()).map(
     ([name, count]) => ({
       name,
-      count
+      count,
     })
   );
 
@@ -184,19 +211,20 @@ export const getRecentActivities = async (): Promise<Activity[]> => [
 
 export const getUsers = async (): Promise<User[]> => [
   {
+    id: "1", // added id
     name: "Sarah Wilson",
     role: "Admin",
     department: "Retail Banking",
     lastActivity: "2 hours ago",
   },
   {
+    id: "2", // added id
     name: "Mike Johnson",
     role: "Editor",
     department: "Security",
     lastActivity: "5 hours ago",
   },
 ];
-// Add these to your existing templateService.ts
 
 export const getTemplateById = async (id: string): Promise<Template> => {
   if (!id) throw new Error("Template ID is required");
@@ -245,8 +273,8 @@ export const deleteTemplate = async (id: string): Promise<void> => {
   if (!id) throw new Error("Template ID is required");
 
   // Find the index of the template to delete
-  const templateIndex = templates.findIndex(t => t.id === id);
-  
+  const templateIndex = templates.findIndex((t) => t.id === id);
+
   // If template not found, throw error
   if (templateIndex === -1) {
     throw new Error(`Template with ID ${id} not found`);

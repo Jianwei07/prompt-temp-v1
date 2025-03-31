@@ -15,6 +15,14 @@ export interface Template {
   departmentCodes: string[];
 }
 
+export interface User {
+  id?: string;
+  name: string;
+  role: string;
+  department: string;
+  lastActivity: string;
+}
+
 export interface Collection {
   name: string;
   count: number;

@@ -9,6 +9,8 @@
     "@mui/material": "^5.13.2",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
     "prompt-library": "file:",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -17,13 +19,16 @@
   "devDependencies": {
     "@types/node": "^20.4.5",
     "css-loader": "^6.7.4",
+    "express": "^4.21.2",
     "html-webpack-plugin": "^5.5.1",
     "style-loader": "^3.3.3",
     "ts-loader": "^9.5.0",
     "typescript": "^5.1.6",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^4.15.1"
+    "webpack-dev-middleware": "^7.4.2",
+    "webpack-dev-server": "^4.15.1",
+    "webpack-hot-middleware": "^2.26.1"
   },
   "scripts": {
     "start": "webpack serve --mode development",

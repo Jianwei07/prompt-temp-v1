@@ -1,0 +1,13 @@
+{
+  "versionHistory": [
+    {
+      "commitId": "1001",
+      "templateId": "1",
+      "version": "v1.0",
+      "message": "Initial commit",
+      "userId": "user-456",
+      "userDisplayName": "Creator",
+      "timestamp": "2025-01-30T14:58:00Z"
+    }
+  ]
+}

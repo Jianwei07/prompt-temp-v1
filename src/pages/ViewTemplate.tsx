@@ -15,7 +15,7 @@ import {
 } from "../services/templateService";
 import VersionHistoryItem from "../components/VersionHistoryItem";
 import Header from "../components/Header";
-import { Template, VersionHistory } from "@/types";
+import type { Template, VersionHistory } from "@/types";
 
 const ViewTemplate: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,13 +35,36 @@ const ViewTemplate: React.FC = () => {
         setVersionHistory(historyData);
       } catch (err) {
         setError("Failed to load template");
-        console.error(err);
+        console.error("Error loading template:", err);
       }
     };
     loadTemplate();
   }, [id]);
 
-  if (!template) return <div>Loading...</div>;
+  if (error) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Typography color="error" variant="h6">
+          {error}
+        </Typography>
+      </Container>
+    );
+  }
+
+  if (!template) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Typography>Loading...</Typography>
+      </Container>
+    );
+  }
+
+  // Format lastUsed: if valid date, format; otherwise, display as is
+  let lastUsedDisplay = template.lastUsed;
+  const parsedDate = new Date(template.lastUsed);
+  if (!isNaN(parsedDate.getTime())) {
+    lastUsedDisplay = parsedDate.toLocaleString();
+  }
 
   return (
     <>
@@ -81,8 +104,7 @@ const ViewTemplate: React.FC = () => {
                 <strong>Version:</strong> {template.version || "N/A"}
               </Typography>
               <Typography variant="body2">
-                <strong>Last Updated:</strong>{" "}
-                {new Date(template.lastUsed || "").toLocaleString()}
+                <strong>Last Updated:</strong> {lastUsedDisplay || "Never"}
               </Typography>
               <Typography variant="body2">
                 <strong>Updated By:</strong> {template.updatedBy || "Unknown"}
@@ -92,16 +114,20 @@ const ViewTemplate: React.FC = () => {
             <Paper elevation={2} sx={{ p: 2 }}>
               <Typography variant="subtitle1">Version History</Typography>
               <Divider sx={{ my: 1 }} />
-              <Box>
-                {versionHistory.map((version, index) => (
+              {versionHistory.length > 0 ? (
+                versionHistory.map((version, index) => (
                   <VersionHistoryItem
                     key={version.commitId}
                     version={version}
                     current={index === 0}
                     lastItem={index === versionHistory.length - 1}
                   />
-                ))}
-              </Box>
+                ))
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No version history available
+                </Typography>
+              )}
             </Paper>
           </Grid>
         </Grid>

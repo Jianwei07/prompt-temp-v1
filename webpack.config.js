@@ -1,8 +1,12 @@
 const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const webpack = require("webpack");
 
 module.exports = {
-  entry: "./src/index.tsx",
+  entry: [
+    // Entry point for your app (HMR is enabled via devServer.hot)
+    "./src/index.tsx",
+  ],
   output: {
     path: path.resolve(__dirname, "dist"),
     filename: "bundle.[contenthash].js",
@@ -37,38 +41,38 @@ module.exports = {
       template: "./public/index.html",
       favicon: "./public/favicon.ico",
     }),
+    new webpack.HotModuleReplacementPlugin(),
   ],
   devServer: {
     historyApiFallback: true,
     static: {
       directory: path.join(__dirname, "public"),
       publicPath: "/",
-      watch: true, // Add this to watch static files
+      watch: true,
     },
     compress: true,
     port: 3000,
     hot: true, // Enable Hot Module Replacement
     liveReload: true, // Enable live reloading
-    open: true, // Automatically open browser
+    open: true, // Automatically open the browser
     client: {
       overlay: {
         errors: true,
         warnings: false,
-      }, // Show errors in browser overlay
-      progress: true, // Show compilation progress
-      reconnect: true, // Automatically reconnect
+      },
+      progress: true,
+      reconnect: true,
     },
     watchFiles: {
-      paths: ["src/**/*.{ts,tsx,js,jsx,css}"], // Watch these files for changes
+      paths: ["src/**/*.{ts,tsx,js,jsx,css}"],
       options: {
-        usePolling: true, // Useful for some file systems
-        interval: 500, // Check for changes every 500ms
+        usePolling: true,
+        interval: 500,
       },
     },
   },
   performance: {
     hints: false,
   },
-  // Add this for better source maps (helps with debugging)
   devtool: "eval-cheap-module-source-map",
 };
