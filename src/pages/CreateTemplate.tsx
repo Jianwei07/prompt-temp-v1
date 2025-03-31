@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import {
   Container,
   Grid,
@@ -17,17 +17,21 @@ import {
   ListItemText,
   OutlinedInput,
   SelectChangeEvent,
+  Autocomplete,
 } from "@mui/material";
 import {
   createTemplate,
   getCollections,
+  getTemplateById,
   getUsers,
+  getTemplates,
 } from "../services/templateService";
 import { useNavigate } from "react-router-dom";
 import CollectionCard from "../components/CollectionCard";
 import UserListItem from "../components/UserListItem";
 import Header from "../components/Header";
 import { Collection, User } from "@/types";
+import AddIcon from "@mui/icons-material/Add";
 
 const CreateTemplate: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -41,21 +45,25 @@ const CreateTemplate: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState("");
   const [departmentCodes, setDepartmentCodes] = useState<string[]>([]);
+  const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
+  const [collectionOptions, setCollectionOptions] = useState<string[]>([]);
   const [guardrails, setGuardrails] = useState({
     enforceCharLimit: false,
     requireKeywords: false,
     contentSafety: false,
   });
+  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
+  const [newDepartment, setNewDepartment] = useState("");
+  const [newCollection, setNewCollection] = useState("");
   const navigate = useNavigate();
 
-  const departmentOptions = ["3DS", "TKM", "RETAIL", "CORPORATE"];
   const guardrailOptions = [
     "Enforce character limit",
     "Require specific keywords",
     "Content safety filters",
   ];
 
-  React.useEffect(() => {
+  useEffect(() => {
     const loadData = async () => {
       const [collectionsData, usersData] = await Promise.all([
         getCollections(),
@@ -65,6 +73,30 @@ const CreateTemplate: React.FC = () => {
       setUsers(usersData);
     };
     loadData();
+  }, []);
+
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const templates = await getTemplates();
+        const uniqueDepartments = new Set<string>();
+        const uniqueCollections = new Set<string>();
+
+        templates.forEach(template => {
+          template.departmentCodes?.forEach(code => uniqueDepartments.add(code));
+          if (template.collection) {
+            uniqueCollections.add(template.collection);
+          }
+        });
+
+        setDepartmentOptions(Array.from(uniqueDepartments));
+        setCollectionOptions(Array.from(uniqueCollections));
+      } catch (error) {
+        console.error("Failed to load options:", error);
+      }
+    };
+
+    loadOptions();
   }, []);
 
   const handleChange = (
@@ -86,6 +118,25 @@ const CreateTemplate: React.FC = () => {
       ...guardrails,
       [event.target.name]: event.target.checked,
     });
+  };
+
+  const handleCollectionChange = (event: SelectChangeEvent<string[]>) => {
+    const value = event.target.value;
+    setSelectedCollections(typeof value === "string" ? value.split(",") : value);
+  };
+
+  const handleAddNewDepartment = () => {
+    if (newDepartment.trim() !== "") {
+      setDepartmentCodes(prev => [...prev, newDepartment]);
+      setNewDepartment("");
+    }
+  };
+
+  const handleAddNewCollection = () => {
+    if (newCollection.trim() !== "") {
+      setSelectedCollections(prev => [...prev, newCollection]);
+      setNewCollection("");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -129,7 +180,17 @@ const CreateTemplate: React.FC = () => {
                 <Typography variant="h6" gutterBottom>
                   Prompt Structure
                 </Typography>
-
+                <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
+                  Template Name
+                </Typography>
+                <TextField
+                  fullWidth
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  margin="normal"
+                  required
+                />
                 <Typography variant="subtitle1" gutterBottom>
                   Context
                 </Typography>
@@ -172,52 +233,59 @@ const CreateTemplate: React.FC = () => {
                   placeholder="Include examples of desired output..."
                 />
 
-                <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
-                  Template Name
-                </Typography>
-                <TextField
-                  fullWidth
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  margin="normal"
-                  required
-                />
-
                 <Box sx={{ mt: 3 }}>
                   <Grid container spacing={2}>
                     <Grid item xs={6}>
-                      <FormControl fullWidth sx={{ mt: 1 }}>
-                        <InputLabel>Department Codes</InputLabel>
-                        <Select
-                          multiple
-                          value={departmentCodes}
-                          onChange={handleDepartmentChange}
-                          input={<OutlinedInput label="Department Codes" />}
-                          renderValue={(selected) => (
-                            <Box
-                              sx={{
-                                display: "flex",
-                                flexWrap: "wrap",
-                                gap: 0.5,
-                              }}
-                            >
-                              {selected.map((value) => (
-                                <Chip key={value} label={value} />
-                              ))}
-                            </Box>
-                          )}
-                        >
-                          {departmentOptions.map((code) => (
-                            <MenuItem key={code} value={code}>
-                              <Checkbox
-                                checked={departmentCodes.indexOf(code) > -1}
-                              />
-                              <ListItemText primary={code} />
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
+                      <Autocomplete
+                        multiple
+                        freeSolo
+                        options={departmentOptions}
+                        value={departmentCodes}
+                        onChange={(event, newValue) => {
+                          setDepartmentCodes(newValue);
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Department Codes"
+                            placeholder="Type or select"
+                          />
+                        )}
+                        renderTags={(value, getTagProps) =>
+                          value.map((option, index) => (
+                            <Chip
+                              label={option}
+                              {...getTagProps({ index })}
+                            />
+                          ))
+                        }
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Autocomplete
+                        multiple
+                        freeSolo
+                        options={collectionOptions}
+                        value={selectedCollections}
+                        onChange={(event, newValue) => {
+                          setSelectedCollections(newValue);
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Collections"
+                            placeholder="Type or select"
+                          />
+                        )}
+                        renderTags={(value, getTagProps) =>
+                          value.map((option, index) => (
+                            <Chip
+                              label={option}
+                              {...getTagProps({ index })}
+                            />
+                          ))
+                        }
+                      />
                     </Grid>
                   </Grid>
                 </Box>
@@ -262,7 +330,7 @@ const CreateTemplate: React.FC = () => {
 
             <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
               <Typography variant="h6" gutterBottom>
-                Version History
+                Version History [integrate from Bitbucket]
               </Typography>
               <Box>
                 <Typography variant="subtitle2">Current Version</Typography>

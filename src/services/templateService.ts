@@ -10,6 +10,7 @@ import {
 } from "../types";
 
 // Mock database (simple arrays)
+// Can not delete or update or create since hardcoded for now
 let templates: Template[] = [
   {
     id: "1",
@@ -20,16 +21,22 @@ let templates: Template[] = [
     lastUsed: "2 hours ago",
     collection: "Security",
     updatedBy: "J Chua",
+    createdAt: new Date(2025, 1, 30, 14, 58), 
+    updatedAt: new Date(2025, 1, 31, 14, 58), 
+    createdBy: "J Chua",
   },
   {
     id: "2",
     departmentCodes: ["3DS"],
-    name: "Customer Support",
+    name: "Customer Support Test",
     content: "Standard responses for inquiries...",
     version: "v1.0",
     lastUsed: "5 hours ago",
     collection: "Favorites",
-    updatedBy: "Jayden",
+    updatedBy: "J Chua",
+    createdAt: new Date(2025, 1, 30, 14, 58), 
+    updatedAt: new Date(NaN), 
+    createdBy: "",
   },
   {
     id: "3",
@@ -39,7 +46,10 @@ let templates: Template[] = [
     version: "v1.0",
     lastUsed: "5 hours ago",
     collection: "Favorites",
-    updatedBy: "BJ",
+    updatedBy: "J Chua",
+    createdAt: new Date(2025, 2, 3, 14, 58), 
+    updatedAt: new Date(2025, 2, 4, 14, 58), 
+    createdBy: "J Chua",
   },
   {
     id: "4",
@@ -49,7 +59,10 @@ let templates: Template[] = [
     version: "v1.0",
     lastUsed: "5 hours ago",
     collection: "Favorites",
-    updatedBy: "Ami",
+    updatedBy: "J Chua",
+    createdAt: new Date(2025, 3, 30, 14, 58), 
+    updatedAt: new Date(2025, 3, 31, 14, 58), 
+    createdBy: "J Chua",
   },
   {
     id: "5",
@@ -59,7 +72,10 @@ let templates: Template[] = [
     version: "v1.0",
     lastUsed: "5 hours ago",
     collection: "HR",
-    updatedBy: "Ervin",
+    updatedBy: "J Chua",
+    createdAt: new Date(2025, 2, 10, 14, 58), 
+    updatedAt: new Date(2025, 2, 12, 14, 58), 
+    createdBy: "J Chua",
   },
   {
     id: "6",
@@ -69,7 +85,10 @@ let templates: Template[] = [
     version: "v1.0",
     lastUsed: "5 hours ago",
     collection: "CCM",
-    updatedBy: "Ervin",
+    updatedBy: "J Chua",
+    createdAt: new Date(2025, 3, 10, 14, 58), 
+    updatedAt: new Date(2025, 3, 11, 14, 58), 
+    createdBy: "J Chua",
   },
 ];
 
@@ -101,10 +120,13 @@ export const createTemplate = async (
     id: Date.now().toString(),
     name: data.name,
     content: data.content || "",
-    updatedBy: "",
     version: "v1.0",
     lastUsed: "Just now",
     departmentCodes: [],
+    createdAt: new Date(), 
+    createdBy: "BJ",
+    updatedAt: new Date(NaN), 
+    updatedBy: "",
   };
 
   templates.push(newTemplate);
@@ -222,8 +244,18 @@ export const updateTemplate = async (
 export const deleteTemplate = async (id: string): Promise<void> => {
   if (!id) throw new Error("Template ID is required");
 
-  templates = templates.filter((t) => t.id !== id);
+  // Find the index of the template to delete
+  const templateIndex = templates.findIndex(t => t.id === id);
+  
+  // If template not found, throw error
+  if (templateIndex === -1) {
+    throw new Error(`Template with ID ${id} not found`);
+  }
 
+  // Remove the template from the array
+  templates.splice(templateIndex, 1);
+
+  // Log the deletion
   await logToBackend({
     endpoint: `/templates/${id}`,
     method: "DELETE",
@@ -239,6 +271,11 @@ function incrementVersion(version?: string): string {
   return `v${versionNum + 1}.0`;
 }
 
+/**TODO: Integrate with Bitbucket API
+ * Get the version history of a template
+ * @param templateId - The ID of the template
+ * @returns The version history of the template
+ */
 export const getVersionHistory = async (
   templateId: string
 ): Promise<VersionHistory[]> => {

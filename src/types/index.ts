@@ -3,6 +3,9 @@ import { Key } from "react";
 // Core types matching your Figma design
 export interface Template {
   updatedBy: string;
+  updatedAt: Date;
+  createdAt: Date;
+  createdBy: string;
   id: string;
   name: string;
   content: string;

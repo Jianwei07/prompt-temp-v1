@@ -30,6 +30,7 @@ import {
   updateTemplate,
   deleteTemplate,
   getVersionHistory,
+  getTemplates,
 } from "../services/templateService";
 import Header from "../components/Header";
 import type { Template, VersionHistory } from "../types";
@@ -45,14 +46,16 @@ const UpdateTemplate: React.FC = () => {
     collection: "",
     lastUsed: "",
     updatedBy: "",
+    createdAt: new Date(NaN),
+    updatedAt: new Date(NaN),
+    createdBy: "",
   });
   const [versionHistory, setVersionHistory] = useState<VersionHistory[]>([]);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const departmentOptions = ["3DS", "TKM", "RETAIL", "CORPORATE"];
-  const collectionOptions = ["Favorites", "Security", "HR"];
+  const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
+  const [collectionOptions, setCollectionOptions] = useState<string[]>([]);
 
   useEffect(() => {
     const loadTemplate = async () => {
@@ -71,6 +74,9 @@ const UpdateTemplate: React.FC = () => {
           collection: template.collection || "",
           lastUsed: template.lastUsed || "",
           updatedBy: template.updatedBy || "",
+          createdAt: template.createdAt || new Date(NaN),
+          updatedAt: template.updatedAt || new Date(NaN),
+          createdBy: template.createdBy || "",
         });
         setVersionHistory(history);
       } catch (err) {
@@ -81,7 +87,28 @@ const UpdateTemplate: React.FC = () => {
       }
     };
 
+    const loadOptions = async () => {
+      try {
+        const templates = await getTemplates();
+        const uniqueDepartments = new Set<string>();
+        const uniqueCollections = new Set<string>();
+
+        templates.forEach(template => {
+          template.departmentCodes?.forEach(code => uniqueDepartments.add(code));
+          if (template.collection) {
+            uniqueCollections.add(template.collection);
+          }
+        });
+
+        setDepartmentOptions(Array.from(uniqueDepartments));
+        setCollectionOptions(Array.from(uniqueCollections));
+      } catch (error) {
+        console.error("Failed to load options:", error);
+      }
+    };
+
     loadTemplate();
+    loadOptions();
   }, [id]);
 
   const handleChange = (
@@ -279,7 +306,7 @@ const UpdateTemplate: React.FC = () => {
 
             <Paper elevation={3} sx={{ p: 2 }}>
               <Typography variant="body2" color="text.secondary">
-                Last used: {formData.lastUsed || "Never"}
+                Last updated: {formData.lastUsed || "Never"}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Last updated by: {formData.updatedBy || "Unknown"}
