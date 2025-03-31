@@ -12,6 +12,8 @@ const App: React.FC = () => {
     <Router>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/templates" element={<Templates />} />
+        {/* <Route path="/templates/:id" element={<TemplateDetails />} /> */}
         <Route path="/create-template" element={<CreateTemplate />} />
         <Route path="/edit-template/:id" element={<EditTemplate />} />
         <Route path="/view-template/:id" element={<ViewTemplate />} />

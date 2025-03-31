@@ -28,6 +28,16 @@ const Dashboard: React.FC = () => {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
 
+  const getUniqueDepartments = () => {
+    const departments = new Set<string>();
+    templates.forEach(template => {
+      template.departmentCodes?.forEach(code => {
+        departments.add(code);
+      });
+    });
+    return Array.from(departments);
+  };
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -55,7 +65,7 @@ const Dashboard: React.FC = () => {
     <>
       <Header />
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        {/* Department Filter */}
+        {/* Update Department Filter section */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle1" gutterBottom>
             Filter by Department
@@ -66,17 +76,14 @@ const Dashboard: React.FC = () => {
               onClick={() => setSelectedDepartment("")}
               color={!selectedDepartment ? "primary" : "default"}
             />
-            <Chip
-              label="3DS"
-              onClick={() => setSelectedDepartment("3DS")}
-              color={selectedDepartment === "3DS" ? "primary" : "default"}
-            />
-            <Chip
-              label="TKM"
-              onClick={() => setSelectedDepartment("TKM")}
-              color={selectedDepartment === "TKM" ? "primary" : "default"}
-            />
-            {/* Add more department chips as needed */}
+            {getUniqueDepartments().map((department) => (
+              <Chip
+                key={department}
+                label={department}
+                onClick={() => setSelectedDepartment(department)}
+                color={selectedDepartment === department ? "primary" : "default"}
+              />
+            ))}
           </Box>
         </Box>
 

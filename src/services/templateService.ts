@@ -31,6 +31,36 @@ let templates: Template[] = [
     collection: "Favorites",
     updatedBy: "",
   },
+  {
+    id: "3",
+    departmentCodes: ["DDP"],
+    name: "Developer Portal",
+    content: "Standard responses for inquiries...",
+    version: "v1.0",
+    lastUsed: "5 hours ago",
+    collection: "Favorites",
+    updatedBy: "",
+  },
+  {
+    id: "4",
+    departmentCodes: ["DVX"],
+    name: "DevOps Services",
+    content: "Standard responses for inquiries...",
+    version: "v1.0",
+    lastUsed: "5 hours ago",
+    collection: "Favorites",
+    updatedBy: "",
+  },
+  {
+    id: "5",
+    departmentCodes: ["HR"],
+    name: "Human Resources",
+    content: "Standard responses for inquiries...",
+    version: "v1.0",
+    lastUsed: "5 hours ago",
+    collection: "HR",
+    updatedBy: "",
+  },
 ];
 
 // Simple logger for frontend actions
