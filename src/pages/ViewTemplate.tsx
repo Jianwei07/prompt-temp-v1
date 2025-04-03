@@ -1,136 +1,185 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Container,
   Typography,
   Box,
   Paper,
+  Grid,
+  Chip,
   Button,
   Divider,
-  Grid,
+  CircularProgress,
 } from "@mui/material";
-import { useParams, useNavigate } from "react-router-dom";
-import {
-  getTemplateById,
-  getVersionHistory,
-} from "../services/templateService";
-import VersionHistoryItem from "../components/VersionHistoryItem";
+import { useParams, Link } from "react-router-dom";
+import { getTemplate, getVersionHistory } from "../services/templateService";
 import Header from "../components/Header";
-import type { Template, VersionHistory } from "@/types";
+import type { Template, VersionHistory } from "../types";
+import CodeIcon from "@mui/icons-material/Code";
+import BusinessIcon from "@mui/icons-material/Business";
+import HistoryIcon from "@mui/icons-material/History";
 
 const ViewTemplate: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [template, setTemplate] = useState<Template | null>(null);
   const [versionHistory, setVersionHistory] = useState<VersionHistory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const loadTemplate = async () => {
+      if (!id) return;
       try {
-        const [templateData, historyData] = await Promise.all([
-          getTemplateById(id!),
-          getVersionHistory(id!),
+        const [templateData, history] = await Promise.all([
+          getTemplate(id),
+          getVersionHistory(id),
         ]);
         setTemplate(templateData);
-        setVersionHistory(historyData);
+        setVersionHistory(history);
       } catch (err) {
-        setError("Failed to load template");
-        console.error("Error loading template:", err);
+        setError(err instanceof Error ? err.message : "Failed to load template");
+      } finally {
+        setIsLoading(false);
       }
     };
     loadTemplate();
   }, [id]);
 
-  if (error) {
+  if (isLoading) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Typography color="error" variant="h6">
-          {error}
-        </Typography>
-      </Container>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress />
+      </Box>
     );
   }
 
-  if (!template) {
+  if (error || !template) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Typography>Loading...</Typography>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Typography color="error">{error || "Template not found"}</Typography>
       </Container>
     );
-  }
-
-  // Format lastUsed: if valid date, format; otherwise, display as is
-  let lastUsedDisplay = template.lastUsed;
-  const parsedDate = new Date(template.lastUsed);
-  if (!isNaN(parsedDate.getTime())) {
-    lastUsedDisplay = parsedDate.toLocaleString();
   }
 
   return (
     <>
       <Header />
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 3,
-          }}
-        >
-          <Typography variant="h4">{template.name}</Typography>
-          <Button
-            variant="contained"
-            onClick={() => navigate(`/edit-template/${id}`)}
-          >
-            Edit Template
-          </Button>
-        </Box>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Paper sx={{ p: 3 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
+            <Typography variant="h4">{template.name}</Typography>
+            <Button
+              component={Link}
+              to={`/edit-template/${template.id}`}
+              variant="contained"
+            >
+              Edit Template
+            </Button>
+          </Box>
 
-        <Grid container spacing={4}>
-          <Grid item xs={12} md={8}>
-            <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-              <Typography variant="body1" whiteSpace="pre-wrap">
-                {template.content}
-              </Typography>
-            </Paper>
-          </Grid>
+          <Box sx={{ mb: 3 }}>
+            <Chip
+              icon={<BusinessIcon />}
+              label={`Department: ${template.department}`}
+              sx={{ mr: 1 }}
+            />
+            <Chip
+              icon={<CodeIcon />}
+              label={`App Code: ${template.appCode}`}
+              sx={{ mr: 1 }}
+            />
+            <Chip label={`Version ${template.version}`} />
+          </Box>
 
-          <Grid item xs={12} md={4}>
-            <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
-              <Typography variant="subtitle1">Details</Typography>
-              <Divider sx={{ my: 1 }} />
-              <Typography variant="body2">
-                <strong>Version:</strong> {template.version || "N/A"}
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>
+                Content
               </Typography>
-              <Typography variant="body2">
-                <strong>Last Updated:</strong> {lastUsedDisplay || "Never"}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Updated By:</strong> {template.updatedBy || "Unknown"}
-              </Typography>
-            </Paper>
-
-            <Paper elevation={2} sx={{ p: 2 }}>
-              <Typography variant="subtitle1">Version History</Typography>
-              <Divider sx={{ my: 1 }} />
-              {versionHistory.length > 0 ? (
-                versionHistory.map((version, index) => (
-                  <VersionHistoryItem
-                    key={version.commitId}
-                    version={version}
-                    current={index === 0}
-                    lastItem={index === versionHistory.length - 1}
-                  />
-                ))
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No version history available
+              <Paper sx={{ p: 2, bgcolor: "grey.50" }}>
+                <Typography
+                  component="pre"
+                  sx={{
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {template.content}
                 </Typography>
-              )}
-            </Paper>
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>
+                Instructions
+              </Typography>
+              <Paper sx={{ p: 2, bgcolor: "grey.50" }}>
+                <Typography>{template.instructions}</Typography>
+              </Paper>
+            </Grid>
+
+            {template.examples.length > 0 && (
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom>
+                  Examples
+                </Typography>
+                {template.examples.map((example, index) => (
+                  <Paper key={index} sx={{ p: 2, mb: 2, bgcolor: "grey.50" }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Example {index + 1}
+                    </Typography>
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="subtitle2" color="primary">
+                        User Input:
+                      </Typography>
+                      <Typography>{example["User Input"]}</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="subtitle2" color="primary">
+                        Expected Output:
+                      </Typography>
+                      <Typography>{example["Expected Output"]}</Typography>
+                    </Box>
+                  </Paper>
+                ))}
+              </Grid>
+            )}
+
+            <Grid item xs={12}>
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="h6" sx={{ display: "flex", alignItems: "center" }}>
+                  <HistoryIcon sx={{ mr: 1 }} />
+                  Version History
+                </Typography>
+                <Divider sx={{ my: 2 }} />
+                {versionHistory.map((version) => (
+                  <Box key={version.commitId} sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2">
+                      Version {version.version} by {version.userDisplayName}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {new Date(version.timestamp).toLocaleString()}
+                    </Typography>
+                    <Typography variant="body2">{version.message}</Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Created by {template.createdBy} on{" "}
+                  {new Date(template.createdAt).toLocaleString()}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Last updated by {template.updatedBy} on{" "}
+                  {new Date(template.updatedAt).toLocaleString()}
+                </Typography>
+              </Box>
+            </Grid>
           </Grid>
-        </Grid>
+        </Paper>
       </Container>
     </>
   );

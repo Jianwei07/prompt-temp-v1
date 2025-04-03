@@ -10,26 +10,26 @@ const TemplatesPage: React.FC = () => {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   const getUniqueDepartments = () => {
     const departments = new Set<string>();
     templates.forEach(template => {
-      template.departmentCodes?.forEach(code => {
-        departments.add(code);
-      });
+      if (template.department) {
+        departments.add(template.department);
+      }
     });
     return Array.from(departments);
   };
 
-  const getUniqueCollections = () => {
-    const collections = new Set<string>();
+  const getUniqueAppCodes = () => {
+    const appCodes = new Set<string>();
     templates.forEach(template => {
-      if (template.collection) {
-        collections.add(template.collection);
+      if (template.appCode) {
+        appCodes.add(template.appCode);
       }
     });
-    return Array.from(collections);
+    return Array.from(appCodes);
   };
 
   useEffect(() => {
@@ -46,40 +46,18 @@ const TemplatesPage: React.FC = () => {
     loadTemplates();
   }, []);
 
-  // Get collection from URL query parameter
-  const collectionParam = searchParams.get('collection');
-
   // Handle department selection
   const handleDepartmentSelect = (department: string) => {
     setSelectedDepartment(department);
-    // Clear collection filter when department is selected
-    const newSearchParams = new URLSearchParams(searchParams);
-    newSearchParams.delete('collection');
-    setSearchParams(newSearchParams);
   };
 
-  // Handle collection selection
-  const handleCollectionSelect = (collection: string | null) => {
-    // Clear department filter when collection is selected
-    setSelectedDepartment("");
-    if (collection) {
-      setSearchParams({ collection });
-    } else {
-      // Clear collection filter
-      const newSearchParams = new URLSearchParams(searchParams);
-      newSearchParams.delete('collection');
-      setSearchParams(newSearchParams);
+  // Filter templates
+  const filteredTemplates = templates.filter(template => {
+    if (selectedDepartment && template.department !== selectedDepartment) {
+      return false;
     }
-  };
-
-  // Filter templates based on either department or collection
-  const filteredTemplates = collectionParam
-    ? templates.filter(template => template.collection === collectionParam)
-    : selectedDepartment
-    ? templates.filter(template => 
-        template.departmentCodes?.includes(selectedDepartment)
-      )
-    : templates;
+    return true;
+  });
 
   if (isLoading) {
     return (
@@ -92,59 +70,22 @@ const TemplatesPage: React.FC = () => {
   return (
     <>
       <Header />
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
-          <Typography variant="h4">
-            {collectionParam ? `${collectionParam} Templates` : 'All Templates'}
-          </Typography>
-          <Typography variant="subtitle1" color="text.secondary">
-            {filteredTemplates.length} templates available
-          </Typography>
-        </Box>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Templates
+        </Typography>
 
-        {/* Collections Filter */}
         <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle1" gutterBottom sx={{ mb: 1 }}>
-            Collections
-          </Typography>
-          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 3 }}>
-            <Chip
-              label="All Collections"
-              onClick={() => handleCollectionSelect(null)}
-              color={!collectionParam ? "primary" : "default"}
-              disabled={!!selectedDepartment}
-            />
-            {getUniqueCollections().map((collection) => (
-              <Chip
-                key={collection}
-                label={collection}
-                onClick={() => handleCollectionSelect(collection)}
-                color={collectionParam === collection ? "primary" : "default"}
-                disabled={!!selectedDepartment}
-              />
-            ))}
-          </Box>
-        </Box>
-
-        {/* Department Filter */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle1" gutterBottom sx={{ mb: 1 }}>
+          <Typography variant="h6" gutterBottom>
             Filter by Department
           </Typography>
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-            <Chip
-              label="All"
-              onClick={() => handleDepartmentSelect("")}
-              color={!selectedDepartment ? "primary" : "default"}
-              disabled={!!collectionParam}
-            />
-            {getUniqueDepartments().map((department) => (
+            {getUniqueDepartments().map((dept) => (
               <Chip
-                key={department}
-                label={department}
-                onClick={() => handleDepartmentSelect(department)}
-                color={selectedDepartment === department ? "primary" : "default"}
-                disabled={!!collectionParam}
+                key={dept}
+                label={dept}
+                onClick={() => handleDepartmentSelect(dept)}
+                color={selectedDepartment === dept ? "primary" : "default"}
               />
             ))}
           </Box>

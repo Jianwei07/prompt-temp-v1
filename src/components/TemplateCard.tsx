@@ -3,110 +3,62 @@ import {
   Card,
   CardContent,
   Typography,
-  Button,
-  CardActions,
   Box,
   Chip,
+  CardActions,
+  Button,
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import { Template } from "../types";
-import FolderIcon from '@mui/icons-material/Folder';
-import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import CodeIcon from "@mui/icons-material/Code";
+import BusinessIcon from "@mui/icons-material/Business";
 
 interface TemplateCardProps {
   template: Template;
-  onEdit?: () => void;
-  onDelete?: () => void;
 }
 
-const TemplateCard: React.FC<TemplateCardProps> = ({
-  template,
-  onEdit,
-  onDelete,
-}) => {
+const TemplateCard: React.FC<TemplateCardProps> = ({ template }) => {
   return (
     <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <CardContent sx={{ flexGrow: 1 }}>
         <Typography gutterBottom variant="h6" component="div">
           {template.name}
         </Typography>
-        <Typography variant="body2" color="text.secondary" paragraph>
-          {template.content.substring(0, 100)}...
-        </Typography>
         
-        {/* Collection Chip */}
-        <Box sx={{ mb: 1 }}>
+        <Box sx={{ mb: 2 }}>
           <Chip
-            icon={<FolderIcon />}
-            label={template.collection}
+            icon={<BusinessIcon />}
+            label={template.department}
             size="small"
-            variant="outlined"
-            sx={{
-              borderRadius: 1,
-              backgroundColor: 'rgba(0, 0, 0, 0.04)',
-              '& .MuiChip-icon': {
-                color: 'primary.main',
-              },
-            }}
+            sx={{ mr: 1, mb: 1 }}
+          />
+          <Chip
+            icon={<CodeIcon />}
+            label={template.appCode}
+            size="small"
+            sx={{ mb: 1 }}
           />
         </Box>
 
-        {/* Department Code Chips */}
-        <Box sx={{ mb: 2 }}>
-          {template.departmentCodes?.map((code) => (
-            <Chip
-              key={code}
-              icon={<LocalOfferIcon />}
-              label={code}
-              size="small"
-              sx={{
-                mr: 0.5,
-                mb: 0.5,
-                backgroundColor: 'primary.main',
-                color: 'white',
-                '& .MuiChip-icon': {
-                  color: 'white',
-                },
-              }}
-            />
-          ))}
-        </Box>
+        <Typography variant="body2" color="text.secondary" paragraph>
+          {template.content.substring(0, 100)}...
+        </Typography>
 
-        {/* Version and Last Used Info */}
-        <Box sx={{ mt: 1 }}>
-          {template.version && (
-            <Typography variant="caption" color="text.secondary" display="block">
-              Version: {template.version}
-            </Typography>
-          )}
-          <Typography variant="caption" color="text.secondary" display="block">
-            Last used: {template.lastUsed}
-          </Typography>
-          {template.updatedBy && (
-            <Typography variant="caption" color="text.secondary" display="block">
-              Updated by: {template.updatedBy}
-            </Typography>
-          )}
+        <Box sx={{ mt: 2 }}>
+          <Chip
+            label={`v${template.version}`}
+            size="small"
+            variant="outlined"
+          />
         </Box>
       </CardContent>
+      
       <CardActions>
-        <Button
-          size="small"
-          component={Link}
-          to={`/view-template/${template.id}`}
-        >
+        <Button size="small" component={Link} to={`/view-template/${template.id}`}>
           View
         </Button>
-        <Button
-          size="small"
-          component={Link}
-          to={`/edit-template/${template.id}`}
-          onClick={onEdit}
-        >
+        <Button size="small" component={Link} to={`/edit-template/${template.id}`}>
           Edit
-        </Button>
-        <Button size="small" color="error" onClick={onDelete}>
-          Delete
         </Button>
       </CardActions>
     </Card>

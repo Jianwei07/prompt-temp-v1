@@ -2,48 +2,60 @@ import React from "react";
 import {
   ListItem,
   ListItemText,
-  Avatar,
-  ListItemAvatar,
   Typography,
-  Divider,
+  Box,
+  Chip,
 } from "@mui/material";
-import { User } from "../types";
+import { formatDistanceToNow } from "date-fns";
+
+interface User {
+  id: string;
+  name: string;
+  role: string;
+  department: string;
+  lastActivity: string;
+}
 
 interface UserListItemProps {
   user: User;
-  lastItem?: boolean;
 }
 
-const UserListItem: React.FC<UserListItemProps> = ({
-  user,
-  lastItem = false,
-}) => {
-  const initials = user.name
-    .split(" ")
-    .map((n) => n[0])
-    .join("");
+const UserListItem: React.FC<UserListItemProps> = ({ user }) => {
+  const formatTime = (timestamp: string) => {
+    try {
+      return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+    } catch (error) {
+      return timestamp;
+    }
+  };
 
   return (
-    <>
-      <ListItem>
-        <ListItemAvatar>
-          <Avatar>{initials}</Avatar>
-        </ListItemAvatar>
-        <ListItemText
-          primary={user.name}
-          secondary={
-            <>
-              <Typography component="span" variant="body2" color="text.primary">
-                {user.role} | {user.department}
-              </Typography>
-              <br />
-              Last active {user.lastActivity}
-            </>
-          }
-        />
-      </ListItem>
-      {!lastItem && <Divider variant="inset" component="li" />}
-    </>
+    <ListItem alignItems="flex-start">
+      <ListItemText
+        primary={
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Typography component="span" variant="subtitle1">
+              {user.name}
+            </Typography>
+            <Chip
+              label={user.role}
+              size="small"
+              color={user.role.toLowerCase() === "admin" ? "primary" : "default"}
+            />
+          </Box>
+        }
+        secondary={
+          <>
+            <Typography component="span" variant="body2" color="text.primary">
+              {user.department}
+            </Typography>
+            <Typography component="span" variant="body2" color="text.secondary">
+              {" — "}{formatTime(user.lastActivity)}
+            </Typography>
+          </>
+        }
+      />
+    </ListItem>
   );
 };
 

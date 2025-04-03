@@ -4,7 +4,7 @@ import Dashboard from "./pages/Dashboard";
 import CreateTemplate from "./pages/CreateTemplate";
 import EditTemplate from "./pages/UpdateTemplate";
 import ViewTemplate from "./pages/ViewTemplate";
-import CollectionDetail from "./pages/CollectionDetail"; // new page to view templates for a specific collection
+//import CollectionDetail from "./pages/CollectionDetail"; // new page to view templates for a specific collection
 import Support from "./pages/Support";
 import "./styles/global.css";
 
@@ -17,10 +17,10 @@ const App: React.FC = () => {
         <Route path="/edit-template/:id" element={<EditTemplate />} />
         <Route path="/view-template/:id" element={<ViewTemplate />} />
         <Route path="/support" element={<Support />} />
-        <Route
+        {/* <Route
           path="/collections/:collectionName"
           element={<CollectionDetail />}
-        />
+        /> */}
       </Routes>
     </Router>
   );
