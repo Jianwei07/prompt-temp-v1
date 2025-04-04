@@ -4,32 +4,20 @@ import { getTemplates } from "../services/templateService";
 import TemplateCard from "../components/TemplateCard";
 import Header from "../components/Header";
 import { Template } from "../types";
-import { useSearchParams } from "react-router-dom";
 
 const TemplatesPage: React.FC = () => {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
-  const [searchParams] = useSearchParams();
 
   const getUniqueDepartments = () => {
     const departments = new Set<string>();
-    templates.forEach(template => {
+    templates.forEach((template) => {
       if (template.department) {
         departments.add(template.department);
       }
     });
     return Array.from(departments);
-  };
-
-  const getUniqueAppCodes = () => {
-    const appCodes = new Set<string>();
-    templates.forEach(template => {
-      if (template.appCode) {
-        appCodes.add(template.appCode);
-      }
-    });
-    return Array.from(appCodes);
   };
 
   useEffect(() => {
@@ -52,7 +40,7 @@ const TemplatesPage: React.FC = () => {
   };
 
   // Filter templates
-  const filteredTemplates = templates.filter(template => {
+  const filteredTemplates = templates.filter((template) => {
     if (selectedDepartment && template.department !== selectedDepartment) {
       return false;
     }
@@ -103,4 +91,4 @@ const TemplatesPage: React.FC = () => {
   );
 };
 
-export default TemplatesPage; 
+export default TemplatesPage;

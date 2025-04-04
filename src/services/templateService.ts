@@ -91,15 +91,15 @@ import {
 //   },
 // ];
 
-// Simple logger for frontend actions
-const logToBackend = async (log: ApiLog): Promise<void> => {
+// Export logToBackend so it can be used elsewhere
+export const logToBackend = async (log: ApiLog): Promise<void> => {
   try {
     await fetch("http://localhost:4000/api/logs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...log,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }),
     });
   } catch (error) {
@@ -128,14 +128,16 @@ export async function getTemplate(id: string): Promise<Template> {
   return await response.json();
 }
 
-export async function createTemplate(data: CreateTemplateData): Promise<Template> {
+export async function createTemplate(
+  data: CreateTemplateData
+): Promise<Template> {
   const response = await fetch("http://localhost:4000/api/templates", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...data,
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     }),
   });
 
@@ -148,15 +150,20 @@ export async function createTemplate(data: CreateTemplateData): Promise<Template
   return await response.json();
 }
 
-export async function updateTemplate(data: UpdateTemplateData): Promise<Template> {
-  const response = await fetch(`http://localhost:4000/api/templates/${data.id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ...data,
-      updatedAt: new Date().toISOString()
-    }),
-  });
+export async function updateTemplate(
+  data: UpdateTemplateData
+): Promise<Template> {
+  const response = await fetch(
+    `http://localhost:4000/api/templates/${data.id}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...data,
+        updatedAt: new Date().toISOString(),
+      }),
+    }
+  );
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -198,18 +205,59 @@ export const getUsers = async (): Promise<User[]> => {
         name: "Default User",
         role: "Editor",
         department: "Technology",
-        lastActivity: "Just now"
-      }
+        lastActivity: "Just now",
+      },
     ];
   }
   return await response.json();
 };
 
-export async function getVersionHistory(templateId: string): Promise<VersionHistory[]> {
-  const response = await fetch(`http://localhost:4000/api/templates/${templateId}/history`);
+export async function getVersionHistory(
+  templateId: string
+): Promise<VersionHistory[]> {
+  const response = await fetch(
+    `http://localhost:4000/api/templates/${templateId}/history`
+  );
   if (!response.ok) {
     console.error("Error fetching version history:", response.status);
     return [];
   }
   return await response.json();
+}
+
+export async function getBitbucketStructure(): Promise<{
+  departments: string[];
+  appCodes: Array<{ department: string; appCode: string }>;
+}> {
+  try {
+    console.log("Fetching Bitbucket structure...");
+    const response = await fetch(
+      "http://localhost:4000/api/bitbucket/structure"
+    );
+
+    console.log("Response status:", response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Error response:", errorText);
+      throw new Error(
+        `Failed to fetch structure: ${response.status} - ${errorText}`
+      );
+    }
+
+    const data = await response.json();
+    console.log("Received structure data:", data);
+
+    if (!data.success) {
+      throw new Error(data.error || "Failed to fetch structure");
+    }
+
+    return {
+      departments: data.departments || [],
+      appCodes: data.appCodes || [],
+    };
+  } catch (err) {
+    console.error("Error in getBitbucketStructure:", err);
+    throw err;
+  }
 }

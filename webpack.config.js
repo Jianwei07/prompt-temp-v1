@@ -3,6 +3,7 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const webpack = require("webpack");
 
 module.exports = {
+  mode: "development",
   entry: [
     // Entry point for your app (HMR is enabled via devServer.hot)
     "./src/index.tsx",
