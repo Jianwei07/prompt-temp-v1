@@ -8,5 +8,6 @@ Parts to remove before going SIT
 
 FOR TESTING
 
-1. npm start
-2. node src/server.js
+- run both fronend and backend
+1. npm start 
+

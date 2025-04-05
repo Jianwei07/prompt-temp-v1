@@ -33,9 +33,10 @@
     "webpack-hot-middleware": "^2.26.1"
   },
   "scripts": {
-    "start": "ts-node src/server_new.js",
-    "dev": "nodemon --exec ts-node src/server_new.js",
-    "build": "tsc",
+    "start": "node src/server_new.js",
+    "dev": "nodemon src/server_new.js",
+    "frontend": "webpack serve --mode development --port 3000",
+    "build": "webpack --mode production",
     "test": "echo \"Error: no test specified\" && exit 1",
     "type-check": "tsc --noEmit"
   },

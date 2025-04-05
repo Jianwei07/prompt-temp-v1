@@ -6,6 +6,7 @@ const path = require("path");
 const cors = require("cors");
 const webpackDevMiddleware = require("webpack-dev-middleware");
 const webpackHotMiddleware = require("webpack-hot-middleware");
+const { exec } = require('child_process');
 
 // Optionally, if Node version does not have global FormData, uncomment the following lines:
 // const FormData = require("form-data");
@@ -53,6 +54,14 @@ app.post("/api/templates", async (req, res) => {
     });
   }
 
+  // Get Singapore time (UTC+8)
+  const sgTime = new Date();
+  sgTime.setHours(sgTime.getHours() + 8);
+  const sgTimeString = sgTime.toISOString();
+
+  // Get username from environment variable or use a default
+  const username = process.env.BITBUCKET_USERNAME || "System";
+
   // Create a properly formatted JSON content
   const jsonContent = {
     "Template Name": name,
@@ -62,10 +71,10 @@ app.post("/api/templates", async (req, res) => {
     "Main Prompt Content": content,
     "Additional Instructions": instructions || "",
     Examples: examples || [],
-    "Created At": new Date().toISOString(),
-    "Updated At": new Date().toISOString(),
-    "Created By": "System", // This could be replaced with actual user info if available
-    "Updated By": "System",
+    "Created At": sgTimeString,
+    "Updated At": "",
+    "Created By": username, // Use environment variable
+    "Updated By": ""
   };
 
   // Create a JSON-friendly filename
@@ -75,7 +84,6 @@ app.post("/api/templates", async (req, res) => {
 
   const workspace = process.env.BITBUCKET_WORKSPACE;
   const repoSlug = process.env.BITBUCKET_REPO;
-  const username = process.env.BITBUCKET_USERNAME;
   const appPassword = process.env.BITBUCKET_APP_PASSWORD;
 
   console.log("Bitbucket Config:", { workspace, repoSlug, username });
@@ -143,9 +151,11 @@ app.post("/api/templates", async (req, res) => {
         content,
         instructions,
         examples,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: sgTimeString,
+        createdBy: username,
         version: "v1.0",
+        updatedAt: "",
+        updatedBy: "",
       },
     });
   } catch (err) {
@@ -652,8 +662,29 @@ app.use("/api", (req, res) => {
 app.use(express.static(path.join(__dirname, "../public")));
 
 const PORT = process.env.PORT || 4000;
+
+// Start the frontend webpack server in a separate process
+const startFrontend = () => {
+  const frontend = exec('webpack serve --mode development --port 3000');
+  
+  frontend.stdout.on('data', (data) => {
+    console.log(`Frontend: ${data}`);
+  });
+  
+  frontend.stderr.on('data', (data) => {
+    console.error(`Frontend error: ${data}`);
+  });
+  
+  frontend.on('close', (code) => {
+    console.log(`Frontend process exited with code ${code}`);
+  });
+};
+
+// Start the frontend
+startFrontend();
+
+// Start the backend
 app.listen(PORT, () => {
-  console.log(
-    `Express server with webpack is running on http://localhost:${PORT}`
-  );
+  console.log(`Backend server running at http://localhost:${PORT}`);
+  console.log(`Frontend should be available at http://localhost:3000`);
 });
