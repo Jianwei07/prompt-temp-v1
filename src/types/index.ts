@@ -28,8 +28,17 @@ export interface CreateTemplateData {
   }>;
 }
 
-export interface UpdateTemplateData extends CreateTemplateData {
+export interface UpdateTemplateData {
   id: string;
+  name: string;
+  department: string;
+  appCode: string;
+  content: string;
+  instructions?: string;
+  examples?: Array<{
+    "User Input": string;
+    "Expected Output": string;
+  }>;
 }
 
 export interface Activity {

@@ -53,6 +53,12 @@ const CreateTemplate: React.FC = () => {
     examples: [{ "User Input": "", "Expected Output": "" }],
   });
 
+  // Add state for examples
+  const [examples, setExamples] = useState<Array<{
+    "User Input": string;
+    "Expected Output": string;
+  }>>([]);
+
   // Fetch departments and app codes from Bitbucket when component mounts
   useEffect(() => {
     const fetchStructure = async () => {
@@ -110,6 +116,24 @@ const CreateTemplate: React.FC = () => {
     }
   }, [formData.department, appCodes]);
 
+  // Initialize examples from formData
+  useEffect(() => {
+    if (formData.examples && formData.examples.length > 0) {
+      setExamples(formData.examples);
+    } else {
+      // Make sure we have at least one empty example
+      setExamples([{ "User Input": "", "Expected Output": "" }]);
+    }
+  }, []);
+
+  // Update formData whenever examples change
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      examples
+    }));
+  }, [examples]);
+
   const validateForm = () => {
     const errors = {
       name: !formData.name.trim(),
@@ -121,17 +145,46 @@ const CreateTemplate: React.FC = () => {
     return !Object.values(errors).some((isError) => isError);
   };
 
+  // Add a function to add examples
+  const addExample = () => {
+    setExamples([...examples, { "User Input": "", "Expected Output": "" }]);
+  };
+
+  // Add a function to update an example
+  const updateExample = (index: number, field: "User Input" | "Expected Output", value: string) => {
+    const newExamples = [...examples];
+    newExamples[index][field] = value;
+    setExamples(newExamples);
+  };
+
+  // Add a function to remove an example
+  const removeExample = (index: number) => {
+    setExamples(examples.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Only process the form submission if we're on the last step
+    if (activeStep !== steps.length - 1) {
+      handleNext(); // Just go to the next step if not on the final step
+      return;
+    }
 
     if (!validateForm()) {
       setError("Please fill in all required fields.");
       return;
     }
 
+    // Update formData with examples before sending
+    const templateData = {
+      ...formData,
+      examples // Include the examples array 
+    };
+
     setIsLoading(true);
     try {
-      await createTemplate(formData);
+      await createTemplate(templateData);
       navigate("/");
     } catch (err) {
       setError(
@@ -142,7 +195,12 @@ const CreateTemplate: React.FC = () => {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = (e?: React.MouseEvent) => {
+    // Prevent any form submission
+    if (e) {
+      e.preventDefault();
+    }
+
     if (activeStep === 0 && !validateForm()) {
       setError("Please fill in all required fields.");
       return;
@@ -285,7 +343,7 @@ const CreateTemplate: React.FC = () => {
       case 2:
         return (
           <Box>
-            {formData.examples.map((example, index) => (
+            {examples.map((example, index) => (
               <Box key={index} sx={{ mb: 3 }}>
                 <Typography variant="subtitle1" gutterBottom>
                   Example {index + 1}
@@ -297,9 +355,7 @@ const CreateTemplate: React.FC = () => {
                       label="User Input"
                       value={example["User Input"]}
                       onChange={(e) => {
-                        const newExamples = [...formData.examples];
-                        newExamples[index]["User Input"] = e.target.value;
-                        setFormData({ ...formData, examples: newExamples });
+                        updateExample(index, "User Input", e.target.value);
                       }}
                     />
                   </Grid>
@@ -309,26 +365,27 @@ const CreateTemplate: React.FC = () => {
                       label="Expected Output"
                       value={example["Expected Output"]}
                       onChange={(e) => {
-                        const newExamples = [...formData.examples];
-                        newExamples[index]["Expected Output"] = e.target.value;
-                        setFormData({ ...formData, examples: newExamples });
+                        updateExample(index, "Expected Output", e.target.value);
                       }}
                     />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      onClick={() => {
+                        removeExample(index);
+                      }}
+                    >
+                      Remove Example
+                    </Button>
                   </Grid>
                 </Grid>
               </Box>
             ))}
             <Button
               variant="outlined"
-              onClick={() => {
-                setFormData({
-                  ...formData,
-                  examples: [
-                    ...formData.examples,
-                    { "User Input": "", "Expected Output": "" },
-                  ],
-                });
-              }}
+              onClick={addExample}
             >
               Add Another Example
             </Button>
@@ -386,7 +443,7 @@ const CreateTemplate: React.FC = () => {
                     Create Template
                   </Button>
                 ) : (
-                  <Button variant="contained" onClick={handleNext}>
+                  <Button variant="contained" onClick={handleNext} type="button">
                     Next
                   </Button>
                 )}

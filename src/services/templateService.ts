@@ -153,14 +153,25 @@ export async function createTemplate(
 export async function updateTemplate(
   data: UpdateTemplateData
 ): Promise<Template> {
+  // Make sure we have an ID
+  if (!data.id) {
+    throw new Error("Template ID is required for updates");
+  }
+
+  console.log("Updating template with data:", data);
+
   const response = await fetch(
     `http://localhost:4000/api/templates/${data.id}`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...data,
-        updatedAt: new Date().toISOString(),
+        name: data.name,
+        content: data.content,
+        department: data.department,
+        appCode: data.appCode,
+        instructions: data.instructions || "",
+        examples: data.examples || [],
       }),
     }
   );
@@ -168,10 +179,16 @@ export async function updateTemplate(
   if (!response.ok) {
     const errorText = await response.text();
     console.error("Error updating template:", response.status, errorText);
-    throw new Error("Failed to update template");
+    throw new Error(`Failed to update template: ${errorText}`);
   }
 
-  return await response.json();
+  const result = await response.json();
+  
+  if (!result.success || !result.template) {
+    throw new Error("Invalid response format from server");
+  }
+  
+  return result.template;
 }
 
 export async function deleteTemplate(id: string): Promise<void> {

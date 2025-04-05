@@ -45,6 +45,7 @@ const UpdateTemplate: React.FC = () => {
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     const loadTemplate = async () => {
@@ -69,14 +70,35 @@ const UpdateTemplate: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError("");
+    
     try {
-      await updateTemplate({
-        ...formData,
-        id: id || "",
+      if (!formData.id) {
+        throw new Error("Template ID is missing");
+      }
+      
+      console.log("Submitting update for template:", formData);
+      
+      const updatedTemplate = await updateTemplate({
+        id: formData.id,
+        name: formData.name,
+        department: formData.department,
+        appCode: formData.appCode,
+        content: formData.content,
+        instructions: formData.instructions,
+        examples: formData.examples,
       });
-      navigate("/");
+      
+      console.log("Template updated successfully:", updatedTemplate);
+      setMessage("Template updated successfully!");
+      
+      // Navigate to the updated template's view page after a short delay
+      setTimeout(() => {
+        navigate(`/view-template/${updatedTemplate.id}`);
+      }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update template");
+      console.error("Error updating template:", err);
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
     }
@@ -114,6 +136,11 @@ const UpdateTemplate: React.FC = () => {
           {error && (
             <Typography color="error" gutterBottom>
               {error}
+            </Typography>
+          )}
+          {message && (
+            <Typography color="success" gutterBottom>
+              {message}
             </Typography>
           )}
           <form onSubmit={handleSubmit}>
