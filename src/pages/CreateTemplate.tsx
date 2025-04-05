@@ -42,6 +42,7 @@ const CreateTemplate: React.FC = () => {
     name: false,
     department: false,
     appCode: false,
+    content: false,
   });
 
   const [formData, setFormData] = useState<CreateTemplateData>({
@@ -51,13 +52,21 @@ const CreateTemplate: React.FC = () => {
     content: "",
     instructions: "",
     examples: [{ "User Input": "", "Expected Output": "" }],
+    // These will be set by the server
+    version: "v1.0",
+    createdBy: "",
+    createdAt: "",
+    updatedBy: "",
+    updatedAt: "",
   });
 
   // Add state for examples
-  const [examples, setExamples] = useState<Array<{
-    "User Input": string;
-    "Expected Output": string;
-  }>>([]);
+  const [examples, setExamples] = useState<
+    Array<{
+      "User Input": string;
+      "Expected Output": string;
+    }>
+  >([{ "User Input": "", "Expected Output": "" }]);
 
   // Fetch departments and app codes from Bitbucket when component mounts
   useEffect(() => {
@@ -116,21 +125,11 @@ const CreateTemplate: React.FC = () => {
     }
   }, [formData.department, appCodes]);
 
-  // Initialize examples from formData
-  useEffect(() => {
-    if (formData.examples && formData.examples.length > 0) {
-      setExamples(formData.examples);
-    } else {
-      // Make sure we have at least one empty example
-      setExamples([{ "User Input": "", "Expected Output": "" }]);
-    }
-  }, []);
-
   // Update formData whenever examples change
   useEffect(() => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      examples
+      examples,
     }));
   }, [examples]);
 
@@ -139,6 +138,7 @@ const CreateTemplate: React.FC = () => {
       name: !formData.name.trim(),
       department: !formData.department,
       appCode: !formData.appCode,
+      content: activeStep >= 1 && !formData.content.trim(),
     };
 
     setFormErrors(errors);
@@ -151,7 +151,11 @@ const CreateTemplate: React.FC = () => {
   };
 
   // Add a function to update an example
-  const updateExample = (index: number, field: "User Input" | "Expected Output", value: string) => {
+  const updateExample = (
+    index: number,
+    field: "User Input" | "Expected Output",
+    value: string
+  ) => {
     const newExamples = [...examples];
     newExamples[index][field] = value;
     setExamples(newExamples);
@@ -159,7 +163,12 @@ const CreateTemplate: React.FC = () => {
 
   // Add a function to remove an example
   const removeExample = (index: number) => {
-    setExamples(examples.filter((_, i) => i !== index));
+    if (examples.length > 1) {
+      setExamples(examples.filter((_, i) => i !== index));
+    } else {
+      // Don't remove the last example, just clear it
+      setExamples([{ "User Input": "", "Expected Output": "" }]);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -176,17 +185,39 @@ const CreateTemplate: React.FC = () => {
       return;
     }
 
+    // Clean up examples - remove empty ones
+    const cleanedExamples = examples.filter(
+      (ex) => ex["User Input"].trim() || ex["Expected Output"].trim()
+    );
+
+    // If all examples were empty, keep one empty example
+    const finalExamples =
+      cleanedExamples.length > 0
+        ? cleanedExamples
+        : [{ "User Input": "", "Expected Output": "" }];
+
     // Update formData with examples before sending
     const templateData = {
       ...formData,
-      examples // Include the examples array 
+      examples: finalExamples,
+      // Add default version (server will handle the rest)
+      version: "v1.0",
     };
+
+    console.log("Submitting template data:", templateData);
 
     setIsLoading(true);
     try {
-      await createTemplate(templateData);
+      const createdTemplate = await createTemplate(templateData);
+      console.log("Template created successfully:", createdTemplate);
+
+      // Show a success message
+      setError("");
+
+      // Navigate to the template list
       navigate("/");
     } catch (err) {
+      console.error("Error creating template:", err);
       setError(
         err instanceof Error ? err.message : "Failed to create template"
       );
@@ -203,6 +234,12 @@ const CreateTemplate: React.FC = () => {
 
     if (activeStep === 0 && !validateForm()) {
       setError("Please fill in all required fields.");
+      return;
+    }
+
+    if (activeStep === 1 && !formData.content.trim()) {
+      setFormErrors((prev) => ({ ...prev, content: true }));
+      setError("Content is required before proceeding.");
       return;
     }
 
@@ -316,26 +353,36 @@ const CreateTemplate: React.FC = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Content"
+                label="Content *"
                 multiline
                 rows={6}
                 value={formData.content}
-                onChange={(e) =>
-                  setFormData({ ...formData, content: e.target.value })
-                }
+                onChange={(e) => {
+                  setFormData({ ...formData, content: e.target.value });
+                  if (e.target.value.trim()) {
+                    setFormErrors((prev) => ({ ...prev, content: false }));
+                  }
+                }}
                 required
+                error={formErrors.content}
+                helperText={
+                  formErrors.content
+                    ? "Content is required"
+                    : "This is the main prompt template content"
+                }
               />
             </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Instructions"
+                label="Instructions (Optional)"
                 multiline
                 rows={4}
                 value={formData.instructions}
                 onChange={(e) =>
                   setFormData({ ...formData, instructions: e.target.value })
                 }
+                helperText="Additional instructions for using this template"
               />
             </Grid>
           </Grid>
@@ -383,10 +430,7 @@ const CreateTemplate: React.FC = () => {
                 </Grid>
               </Box>
             ))}
-            <Button
-              variant="outlined"
-              onClick={addExample}
-            >
+            <Button variant="outlined" onClick={addExample}>
               Add Another Example
             </Button>
           </Box>
@@ -443,7 +487,11 @@ const CreateTemplate: React.FC = () => {
                     Create Template
                   </Button>
                 ) : (
-                  <Button variant="contained" onClick={handleNext} type="button">
+                  <Button
+                    variant="contained"
+                    onClick={handleNext}
+                    type="button"
+                  >
                     Next
                   </Button>
                 )}

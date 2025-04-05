@@ -21,11 +21,13 @@ export interface CreateTemplateData {
   department: string;
   appCode: string;
   content: string;
-  instructions: string;
-  examples: Array<{
-    "User Input": string;
-    "Expected Output": string;
-  }>;
+  instructions?: string;
+  examples: Array<{ "User Input": string; "Expected Output": string }>;
+  version?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedBy?: string;
+  updatedAt?: string;
 }
 
 export interface UpdateTemplateData {

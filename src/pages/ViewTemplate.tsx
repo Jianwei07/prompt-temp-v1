@@ -36,7 +36,9 @@ const ViewTemplate: React.FC = () => {
         setTemplate(templateData);
         setVersionHistory(history);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load template");
+        setError(
+          err instanceof Error ? err.message : "Failed to load template"
+        );
       } finally {
         setIsLoading(false);
       }
@@ -46,7 +48,12 @@ const ViewTemplate: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="100vh"
+      >
         <CircularProgress />
       </Box>
     );
@@ -147,22 +154,34 @@ const ViewTemplate: React.FC = () => {
 
             <Grid item xs={12}>
               <Box sx={{ mt: 2 }}>
-                <Typography variant="h6" sx={{ display: "flex", alignItems: "center" }}>
+                <Typography
+                  variant="h6"
+                  sx={{ display: "flex", alignItems: "center" }}
+                >
                   <HistoryIcon sx={{ mr: 1 }} />
                   Version History
                 </Typography>
                 <Divider sx={{ my: 2 }} />
-                {versionHistory.map((version) => (
-                  <Box key={version.commitId} sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2">
-                      Version {version.version} by {version.userDisplayName}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {new Date(version.timestamp).toLocaleString()}
-                    </Typography>
-                    <Typography variant="body2">{version.message}</Typography>
-                  </Box>
-                ))}
+                {Array.isArray(versionHistory) && versionHistory.length > 0 ? (
+                  versionHistory.map((version) => (
+                    <Box
+                      key={version.commitId || `version-${Math.random()}`}
+                      sx={{ mb: 2 }}
+                    >
+                      <Typography variant="subtitle2">
+                        Version {version.version} by {version.userDisplayName}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {new Date(version.timestamp).toLocaleString()}
+                      </Typography>
+                      <Typography variant="body2">{version.message}</Typography>
+                    </Box>
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No version history available
+                  </Typography>
+                )}
               </Box>
             </Grid>
 

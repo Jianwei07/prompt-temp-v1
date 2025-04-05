@@ -183,17 +183,31 @@ export async function updateTemplate(
   }
 
   const result = await response.json();
-  
+
   if (!result.success || !result.template) {
     throw new Error("Invalid response format from server");
   }
-  
+
   return result.template;
 }
 
-export async function deleteTemplate(id: string): Promise<void> {
+export async function deleteTemplate(
+  id: string,
+  comment?: string
+): Promise<{
+  success: boolean;
+  status?: "deleted" | "pending_approval";
+  pullRequestUrl?: string;
+  message?: string;
+}> {
   const response = await fetch(`http://localhost:4000/api/templates/${id}`, {
     method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      requestComment: comment || "",
+    }),
   });
 
   if (!response.ok) {
@@ -201,6 +215,15 @@ export async function deleteTemplate(id: string): Promise<void> {
     console.error("Error deleting template:", response.status, errorText);
     throw new Error("Failed to delete template");
   }
+
+  const result = await response.json();
+
+  return {
+    success: result.success,
+    status: result.status || "deleted",
+    pullRequestUrl: result.pullRequestUrl,
+    message: result.message,
+  };
 }
 
 export async function getRecentActivities(): Promise<Activity[]> {
@@ -232,14 +255,31 @@ export const getUsers = async (): Promise<User[]> => {
 export async function getVersionHistory(
   templateId: string
 ): Promise<VersionHistory[]> {
-  const response = await fetch(
-    `http://localhost:4000/api/templates/${templateId}/history`
-  );
-  if (!response.ok) {
-    console.error("Error fetching version history:", response.status);
+  try {
+    const response = await fetch(
+      `http://localhost:4000/api/templates/${templateId}/history`
+    );
+
+    if (!response.ok) {
+      console.error("Error fetching version history:", response.status);
+      return [];
+    }
+
+    const data = await response.json();
+
+    // Ensure we return an array
+    if (Array.isArray(data)) {
+      return data;
+    } else {
+      console.warn(
+        "Version history is not an array, returning empty array instead"
+      );
+      return [];
+    }
+  } catch (error) {
+    console.error("Error fetching version history:", error);
     return [];
   }
-  return await response.json();
 }
 
 export async function getBitbucketStructure(): Promise<{
