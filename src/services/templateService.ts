@@ -267,9 +267,18 @@ export async function getVersionHistory(
 
     const data = await response.json();
 
+    // Check if the response has the expected structure
+    if (data.success === false) {
+      console.error("Error in version history response:", data.error);
+      return [];
+    }
+
+    // Handle both the new response format and the legacy format
+    const history = data.history || data;
+    
     // Ensure we return an array
-    if (Array.isArray(data)) {
-      return data;
+    if (Array.isArray(history)) {
+      return history;
     } else {
       console.warn(
         "Version history is not an array, returning empty array instead"

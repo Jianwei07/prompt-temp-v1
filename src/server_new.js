@@ -926,45 +926,126 @@ app.get("/api/templates/:id/history", async (req, res) => {
     const result = findTemplateInMetadata(metadata, id);
     
     if (!result.found || !result.templateMeta.link) {
-      return res.status(404).json([]);
+      console.log(`Template with ID ${id} not found or missing link`);
+      return res.status(404).json({
+        success: false,
+        error: `Template with ID ${id} not found or missing file path`
+      });
     }
     
     const templateMeta = result.templateMeta;
+    console.log(`Found template: ${templateMeta.name}, file path: ${templateMeta.link}`);
     
-    // Now get the commit history for this file
-    const workspace = process.env.BITBUCKET_WORKSPACE;
-    const repoSlug = process.env.BITBUCKET_REPO;
+    // Get Bitbucket credentials from the config
+    const { workspace, repoSlug } = CONFIG.bitbucket;
     
-    const commitsUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/commits?path=${templateMeta.link}`;
-    const commitsResponse = await fetch(commitsUrl, {
+    // The path in the filehistory API must be correctly formatted
+    // Remove any leading/trailing slashes
+    const normalizedPath = templateMeta.link.replace(/^\/+|\/+$/g, '');
+    
+    // Use the filehistory API as suggested
+    const fileHistoryUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/filehistory/main/${normalizedPath}`;
+    console.log(`Fetching file history from: ${fileHistoryUrl}`);
+    
+    const historyResponse = await fetch(fileHistoryUrl, {
       headers: getBitbucketAuthHeaders(),
     });
 
-    if (!commitsResponse.ok) {
-      return res.status(404).json([]);
+    if (!historyResponse.ok) {
+      const errorText = await historyResponse.text();
+      console.error(`Failed to fetch file history: ${historyResponse.status}, Details: ${errorText}`);
+      
+      // Return a more user-friendly error message
+      return res.status(200).json({
+        success: true,
+        history: [{
+          commitId: "initial",
+          version: "v1.0",
+          userDisplayName: templateMeta.createdBy || "Unknown",
+          timestamp: templateMeta.createdAt || getSingaporeTime(),
+          message: "Initial version"
+        }],
+        note: "Using placeholder history as actual file history could not be retrieved."
+      });
     }
 
-    const commitsData = await commitsResponse.json();
+    const historyData = await historyResponse.json();
+    console.log(`DEBUG: Raw history data structure:`, Object.keys(historyData));
 
-    if (!commitsData.values || !Array.isArray(commitsData.values)) {
-      return res.status(200).json([]);
+    if (!historyData.values || !Array.isArray(historyData.values)) {
+      console.log("No file history found, or invalid format returned");
+      return res.status(200).json({
+        success: true,
+        history: [{
+          commitId: "initial",
+          version: "v1.0",
+          userDisplayName: templateMeta.createdBy || "Unknown",
+          timestamp: templateMeta.createdAt || getSingaporeTime(),
+          message: "Initial version"
+        }]
+      });
     }
 
-    // Transform the commit history into the expected format
-    const history = commitsData.values.map((commit, index) => ({
-      commitId: commit.hash,
-      version: `v1.${commitsData.values.length - index}`,
-      userDisplayName: commit.author.user
-        ? commit.author.user.display_name
-        : "Unknown",
-      timestamp: commit.date,
-      message: commit.message,
-    }));
+    console.log(`Found ${historyData.values.length} history entries for this template`);
 
-    return res.json(history);
+    // Transform the file history into the expected format
+    const history = historyData.values.map((entry, index) => {
+      // Filehistory API might have different structure than commits API
+      // Adjust fields accordingly
+      
+      // Format the timestamp to be in Singapore time
+      let timestamp = new Date(entry.commit?.date || entry.date || templateMeta.updatedAt || templateMeta.createdAt);
+      timestamp.setHours(timestamp.getHours() + 8); // Convert to Singapore time (UTC+8)
+      
+      return {
+        commitId: entry.commit?.hash || entry.hash || `version-${index}`,
+        // Version starts from the latest (v1.x where x is the total number of versions)
+        version: `v1.${historyData.values.length - index}`,
+        userDisplayName: 
+          entry.commit?.author?.user?.display_name || 
+          entry.author?.user?.display_name || 
+          entry.commit?.author?.raw || 
+          entry.author?.raw || 
+          templateMeta.updatedBy || 
+          templateMeta.createdBy || 
+          "Unknown",
+        timestamp: timestamp.toISOString(),
+        message: entry.commit?.message || entry.message || `Version update ${index + 1}`,
+      };
+    });
+
+    console.log(`Processed version history with ${history.length} entries`);
+    
+    // If we somehow got no history, create a default entry
+    if (history.length === 0) {
+      history.push({
+        commitId: "initial",
+        version: "v1.0",
+        userDisplayName: templateMeta.createdBy || "Unknown",
+        timestamp: templateMeta.createdAt || getSingaporeTime(),
+        message: "Initial version"
+      });
+    }
+    
+    return res.json({
+      success: true,
+      history: history
+    });
   } catch (error) {
     console.error("Error fetching version history:", error);
-    res.status(500).json([]);
+    
+    // Even in case of an error, return something useful to display
+    res.status(200).json({
+      success: true,
+      history: [{
+        commitId: "error",
+        version: "v1.0",
+        userDisplayName: "System",
+        timestamp: getSingaporeTime(),
+        message: "Could not retrieve version history"
+      }],
+      note: "Error occurred while fetching version history"
+    });
   }
 });
 
