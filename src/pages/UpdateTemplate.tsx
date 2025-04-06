@@ -200,10 +200,15 @@ const UpdateTemplate: React.FC = () => {
                   fullWidth
                   label="Name"
                   value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  required
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                  helperText="Template name cannot be changed"
+                  sx={{ 
+                    '& .MuiInputBase-input.Mui-readOnly': {
+                      backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                    }
+                  }}
                 />
               </Grid>
               <Grid item xs={12} md={6}>
