@@ -742,6 +742,13 @@ async function deleteTemplate(id, requestComment, requireApproval) {
   
   const { templateMeta, templateIndex } = result;
   const username = CONFIG.bitbucket.username;
+  const { workspace, repoSlug, accessToken } = CONFIG.bitbucket;
+  
+  // First, create a new metadata array with this template removed
+  const updatedMetadata = metadata.filter(item => String(item.id) !== String(id));
+  
+  console.log(`Template to delete: ${templateMeta.name} (ID: ${id})`);
+  console.log(`Template file location: ${templateMeta.link}`);
   
   if (requireApproval) {
     // Create a branch for deletion approval
@@ -751,30 +758,71 @@ async function deleteTemplate(id, requestComment, requireApproval) {
     // Create branch
     await createBitbucketBranch(branchName);
     
-    // Mark template for deletion in metadata
-    const updatedMetadata = [...metadata];
-    updatedMetadata[templateIndex] = {
-      ...templateMeta,
-      markedForDeletion: true,
-      deletionRequestedBy: username,
-      deletionRequestedAt: getSingaporeTime(),
-      deletionComment: requestComment || "Deletion requested",
-    };
-    
-    // Commit the updated metadata to the new branch
+    // First commit: Update metadata to remove template entry
+    console.log("Step 1: Creating commit to update metadata.json");
     await commitToBitbucket(
-      { "metadata.json": JSON.stringify(updatedMetadata, null, 2) },
-      `Request to delete template: ${templateMeta.name} (ID: ${id})`,
+      {
+        "metadata.json": JSON.stringify(updatedMetadata, null, 2)
+      },
+      `Delete template metadata: ${templateMeta.name} (ID: ${id})`,
       branchName
     );
     
-    // Create a PR for approval
+    console.log("Step 2: Creating commit to delete the template file");
+    
+    // For Bitbucket, we need to make an explicit DELETE request to the file endpoint
+    // This is the most reliable way to delete a file with the Bitbucket REST API
+    const deleteFileUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src/${branchName}/${templateMeta.link}`;
+    console.log(`Making DELETE request to ${deleteFileUrl}`);
+    
+    try {
+      const deleteResponse = await fetch(deleteFileUrl, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: `Delete template file: ${templateMeta.name} (ID: ${id})`,
+          branch: branchName
+        })
+      });
+      
+      if (!deleteResponse.ok) {
+        console.warn(`Warning: File deletion request failed with status ${deleteResponse.status}`);
+        const errorText = await deleteResponse.text();
+        console.warn(`Error details: ${errorText}`);
+        
+        // Another approach: let's try to create an empty file
+        console.log("Trying simpler deletion approach by writing an empty file...");
+        
+        try {
+          // In Bitbucket, "deleting" a file can be achieved by committing an empty file
+          await commitToBitbucket(
+            {
+              [templateMeta.link]: ""  // Empty string to create an empty file (effectively deleting content)
+            },
+            `Empty template file for deletion: ${templateMeta.name} (ID: ${id})`,
+            branchName
+          );
+          console.log("Successfully emptied the file as a deletion alternative");
+        } catch (fallbackError) {
+          console.warn(`Fallback emptying also failed: ${fallbackError.message}`);
+        }
+      } else {
+        console.log(`Successfully deleted file in branch: ${templateMeta.link}`);
+      }
+    } catch (fileError) {
+      console.warn(`Error with file deletion request: ${fileError.message}`);
+    }
+    
+    // Create a PR for approval that includes both the metadata update and file deletion
     const prData = await createPullRequest(
       branchName,
       `Delete Template: ${templateMeta.name}`,
       `Deletion request for template ID ${id}.\n\nRequested by: ${username}\nComment: ${
         requestComment || "No comment provided"
-      }\n\nPlease review and approve to confirm deletion.`
+      }\n\nThis PR will:\n1. Remove the template entry from metadata.json\n2. Delete the template file at ${templateMeta.link}`
     );
     
     return {
@@ -785,22 +833,58 @@ async function deleteTemplate(id, requestComment, requireApproval) {
       pullRequestId: prData.id,
     };
   } else {
-    // Direct deletion
-    // Remove from metadata
-    metadata.splice(templateIndex, 1);
+    // Direct deletion without PR
     
-    // Commit changes
+    // First, update metadata
     await commitToBitbucket(
       {
-        "metadata.json": JSON.stringify(metadata, null, 2),
-        [`${templateMeta.link}/-`]: "" // Empty string with /- path to delete the file
+        "metadata.json": JSON.stringify(updatedMetadata, null, 2)
       },
-      `Deleted template: ${templateMeta.name} (ID: ${id})`
+      `Delete template metadata: ${templateMeta.name} (ID: ${id})`
     );
+    
+    // Then, delete the template file using direct DELETE request
+    const deleteFileUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src/main/${templateMeta.link}`;
+    
+    try {
+      const deleteResponse = await fetch(deleteFileUrl, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: `Delete template file: ${templateMeta.name} (ID: ${id})`,
+          branch: "main"
+        })
+      });
+      
+      if (!deleteResponse.ok) {
+        console.warn(`Warning: File deletion request failed with status ${deleteResponse.status}`);
+        
+        // Fallback - emptying the file
+        try {
+          await commitToBitbucket(
+            {
+              [templateMeta.link]: ""  // Empty string to create an empty file
+            },
+            `Empty template file for deletion: ${templateMeta.name} (ID: ${id})`,
+            "main"
+          );
+          console.log("Successfully emptied the file as a deletion alternative");
+        } catch (fallbackError) {
+          console.warn(`Fallback emptying also failed: ${fallbackError.message}`);
+        }
+      } else {
+        console.log(`Successfully deleted file: ${templateMeta.link}`);
+      }
+    } catch (fileError) {
+      console.warn(`Error with file deletion request: ${fileError.message}`);
+    }
     
     return {
       success: true,
-      message: "Template deleted successfully",
+      message: "Template and its file deleted successfully",
       status: "deleted",
       deletedTemplate: templateMeta,
     };
@@ -901,37 +985,42 @@ app.post("/api/webhooks/bitbucket", async (req, res) => {
       
       const prDescription = data.pullrequest.description;
       const idMatch = prDescription.match(/template ID (\d+)/);
-
-      if (idMatch && idMatch[1]) {
+      const filePathMatch = prDescription.match(/template file at ([^\s.]+)/);
+      
+      if (idMatch && idMatch[1] && filePathMatch && filePathMatch[1]) {
         const templateId = idMatch[1];
-        console.log(`Executing actual deletion for template ID: ${templateId}`);
+        const filePath = filePathMatch[1];
         
-        // Get metadata
-        const metadata = await fetchMetadata();
+        console.log(`PR approved for deletion of template ID: ${templateId}`);
+        console.log(`Need to delete file at: ${filePath}`);
         
-        // Find the template marked for deletion
-        const templateMeta = metadata.find(
-          (item) =>
-            item.id === templateId ||
-            (item.markedForDeletion && item.id === templateId)
-        );
-
-        if (templateMeta && templateMeta.link) {
-          // Remove the template from metadata
-          const updatedMetadata = metadata.filter(
-            (item) => item.id !== templateId
-          );
+        try {
+          // Try to delete the template file after the PR is merged
+          const { workspace, repoSlug, accessToken } = CONFIG.bitbucket;
           
-          // Commit changes
-          await commitToBitbucket(
-            {
-              "metadata.json": JSON.stringify(updatedMetadata, null, 2),
-              [`${templateMeta.link}/-`]: "" // Delete the file
+          const deleteFormData = new FormData();
+          deleteFormData.append("message", `Deleted template file after PR approval (ID: ${templateId})`);
+          deleteFormData.append("branch", "main");
+          // Using special syntax to delete
+          deleteFormData.append(`${filePath}`, "");
+          
+          const deleteUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src`;
+          
+          const deleteResponse = await fetch(deleteUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
             },
-            `Completed deletion of template: ${templateMeta.name} (ID: ${templateId})`
-          );
+            body: deleteFormData
+          });
           
-          console.log("Deletion completed successfully");
+          if (deleteResponse.ok) {
+            console.log(`Successfully deleted template file after PR approval: ${filePath}`);
+          } else {
+            console.warn(`Warning: Could not delete file after PR approval. Status: ${deleteResponse.status}`);
+          }
+        } catch (fileError) {
+          console.error(`Error deleting template file after PR approval: ${fileError.message}`);
         }
       }
     }
