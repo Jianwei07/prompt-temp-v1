@@ -49,7 +49,7 @@ const Support: React.FC = () => {
               </ListItemIcon>
               <ListItemText
                 primary="Phone Support"
-                secondary="+1 (555) 123-4567 (9AM-5PM EST)"
+                secondary="+65 8888 8888"
               />
             </ListItem>
           </List>

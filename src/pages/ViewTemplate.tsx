@@ -22,6 +22,7 @@ import CodeIcon from "@mui/icons-material/Code";
 import BusinessIcon from "@mui/icons-material/Business";
 import HistoryIcon from "@mui/icons-material/History";
 import PersonIcon from "@mui/icons-material/Person";
+import LaunchIcon from '@mui/icons-material/Launch';
 
 const ViewTemplate: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -115,7 +116,7 @@ const ViewTemplate: React.FC = () => {
             </Button>
           </Box>
 
-          <Box sx={{ mb: 3 }}>
+          <Box sx={{ mb: 4 }}>
             <Chip
               icon={<BusinessIcon />}
               label={`Department: ${template.department}`}
@@ -126,12 +127,42 @@ const ViewTemplate: React.FC = () => {
               label={`App Code: ${template.appCode}`}
               sx={{ mr: 1 }}
             />
-            <Chip label={`Version ${template.version}`} />
+            <Chip label={`Version ${template.version}`} sx={{ mr: 1 }} />
+
+            <Box 
+              component="a"
+              href={`https://bitbucket.org/debugging-dragons/prompt-template/src/main/${template.department}/${template.appCode}/${template.name}.json`}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                color: '#2684FF', // Bitbucket blue
+                textDecoration: 'none',
+                fontSize: '0.875rem',
+                fontFamily: 'monospace',
+                ml: 1,
+                bgcolor: 'rgba(38, 132, 255, 0.08)', // Light blue background
+                py: 0.75,
+                px: 1.5,
+                borderRadius: 1,
+                transition: 'all 0.2s ease',
+                border: '1px solid transparent',
+                '&:hover': {
+                  bgcolor: 'rgba(38, 132, 255, 0.12)',
+                  border: '1px solid rgba(38, 132, 255, 0.3)',
+                }
+              }}
+            >
+              View in Bitbucket
+              <LaunchIcon sx={{ ml: 0.5, fontSize: 16 }} />
+            </Box>
           </Box>
 
           <Grid container spacing={3}>
             {/* Left Column - Content */}
             <Grid item xs={12} md={7}>
+
               <Typography variant="h6" gutterBottom>
                 Content
               </Typography>

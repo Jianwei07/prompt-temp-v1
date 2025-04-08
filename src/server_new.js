@@ -944,7 +944,7 @@ app.get("/api/templates/:id/history", async (req, res) => {
     const normalizedPath = templateMeta.link.replace(/^\/+|\/+$/g, '');
     
     // Use the filehistory API as suggested
-    const fileHistoryUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/filehistory/main/${normalizedPath}`;
+    const fileHistoryUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/commits?path=${normalizedPath}&branch=main`;
     console.log(`Fetching file history from: ${fileHistoryUrl}`);
     
     const historyResponse = await fetch(fileHistoryUrl, {
@@ -985,21 +985,28 @@ app.get("/api/templates/:id/history", async (req, res) => {
         }]
       });
     }
-
+    console.log(`Data fetched from filehistory API: ${historyData.values} `)
     console.log(`Found ${historyData.values.length} history entries for this template`);
 
-    // Transform the file history into the expected format
-    const history = historyData.values.map((entry, index) => {
-      // Filehistory API might have different structure than commits API
-      // Adjust fields accordingly
-      
-      // Format the timestamp to be in Singapore time
+    // Add the initial commit from metadata first
+    const initialTimestamp = new Date(templateMeta.createdAt);
+    initialTimestamp.setHours(initialTimestamp.getHours() + 8);
+
+    const history = [{
+      commitId: "initial",
+      version: "v1.0",
+      userDisplayName: templateMeta.createdBy || "Unknown",
+      timestamp: initialTimestamp.toISOString(),
+      message: "Initial commit"
+    }];
+
+    // Then add the rest of the history
+    history.push(...historyData.values.map((entry, index) => {
       let timestamp = new Date(entry.commit?.date || entry.date || templateMeta.updatedAt || templateMeta.createdAt);
-      timestamp.setHours(timestamp.getHours() + 8); // Convert to Singapore time (UTC+8)
+      timestamp.setHours(timestamp.getHours() + 8);
       
       return {
         commitId: entry.commit?.hash || entry.hash || `version-${index}`,
-        // Version starts from the latest (v1.x where x is the total number of versions)
         version: `v1.${historyData.values.length - index}`,
         userDisplayName: 
           entry.commit?.author?.user?.display_name || 
@@ -1012,20 +1019,12 @@ app.get("/api/templates/:id/history", async (req, res) => {
         timestamp: timestamp.toISOString(),
         message: entry.commit?.message || entry.message || `Version update ${index + 1}`,
       };
-    });
+    }));
 
-    console.log(`Processed version history with ${history.length} entries`);
-    
-    // If we somehow got no history, create a default entry
-    if (history.length === 0) {
-      history.push({
-        commitId: "initial",
-        version: "v1.0",
-        userDisplayName: templateMeta.createdBy || "Unknown",
-        timestamp: templateMeta.createdAt || getSingaporeTime(),
-        message: "Initial version"
-      });
-    }
+    // Sort the history by timestamp to ensure correct ordering
+    history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    console.log(`Processed version history with ${history.length} entries (including initial commit)`);
     
     return res.json({
       success: true,
