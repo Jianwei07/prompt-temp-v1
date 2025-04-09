@@ -45,6 +45,14 @@ const VersionHistoryCard: React.FC<VersionHistoryProps> = ({ history, containerS
       .substring(0, 2);
   };
 
+  // Sort history by version number (highest version number first)
+  const sortedHistory = [...history].sort((a, b) => {
+    // Extract version numbers (e.g., "v1.3" -> 1.3)
+    const versionA = parseFloat(a.version.replace('v', ''));
+    const versionB = parseFloat(b.version.replace('v', ''));
+    return versionB - versionA; // Descending order
+  });
+
   return (
     <Paper 
       variant="outlined" 
@@ -69,9 +77,9 @@ const VersionHistoryCard: React.FC<VersionHistoryProps> = ({ history, containerS
       
       <Divider sx={{ mb: 2 }} />
       
-      {Array.isArray(history) && history.length > 0 ? (
+      {Array.isArray(sortedHistory) && sortedHistory.length > 0 ? (
         <Stack spacing={1.5} sx={{ maxHeight: "70vh", overflow: "auto", pr: 1 }}>
-          {history.map((version, index) => (
+          {sortedHistory.map((version, index) => (
             <Card 
               key={version.commitId || `version-${index}`}
               variant="outlined" 

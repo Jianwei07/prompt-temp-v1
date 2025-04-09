@@ -985,29 +985,24 @@ app.get("/api/templates/:id/history", async (req, res) => {
         }]
       });
     }
-    console.log(`Data fetched from filehistory API: ${historyData.values} `)
+    
+    console.log(`Data fetched from filehistory API: ${historyData.values} `);
     console.log(`Found ${historyData.values.length} history entries for this template`);
 
-    // Add the initial commit from metadata first
-    const initialTimestamp = new Date(templateMeta.createdAt);
-    initialTimestamp.setHours(initialTimestamp.getHours() + 8);
-
-    const history = [{
-      commitId: "initial",
-      version: "v1.0",
-      userDisplayName: templateMeta.createdBy || "Unknown",
-      timestamp: initialTimestamp.toISOString(),
-      message: "Initial commit"
-    }];
-
-    // Then add the rest of the history
-    history.push(...historyData.values.map((entry, index) => {
+    // Transform the file history into the expected format
+    // Start version numbering from v1.0 for the earliest commit
+    const history = historyData.values.map((entry, index) => {
       let timestamp = new Date(entry.commit?.date || entry.date || templateMeta.updatedAt || templateMeta.createdAt);
-      timestamp.setHours(timestamp.getHours() + 8);
+      timestamp.setHours(timestamp.getHours());
+      
+      // Calculate version - the oldest commit (last in the array) should be v1.0
+      const versionNumber = index === historyData.values.length - 1 
+        ? "v1.0" 
+        : `v1.${historyData.values.length - 1 - index}`;
       
       return {
         commitId: entry.commit?.hash || entry.hash || `version-${index}`,
-        version: `v1.${historyData.values.length - index}`,
+        version: versionNumber,
         userDisplayName: 
           entry.commit?.author?.user?.display_name || 
           entry.author?.user?.display_name || 
@@ -1019,12 +1014,12 @@ app.get("/api/templates/:id/history", async (req, res) => {
         timestamp: timestamp.toISOString(),
         message: entry.commit?.message || entry.message || `Version update ${index + 1}`,
       };
-    }));
+    });
 
     // Sort the history by timestamp to ensure correct ordering
     history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    console.log(`Processed version history with ${history.length} entries (including initial commit)`);
+    console.log(`Processed version history with ${history.length} entries from Bitbucket`);
     
     return res.json({
       success: true,
@@ -1151,6 +1146,6 @@ app.listen(PORT, () => {
 // Add this helper function near the other helpers
 function getSingaporeTime() {
   const sgTime = new Date();
-  sgTime.setHours(sgTime.getHours() + 8); // Add 8 hours for Singapore time (UTC+8)
+  sgTime.setHours(sgTime.getHours()); // Add 8 hours for Singapore time (UTC+8)
   return sgTime.toISOString();
 }

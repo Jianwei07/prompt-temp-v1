@@ -15,6 +15,8 @@ import {
   Grid,
   Link,
   Alert,
+  TextareaAutosize,
+  InputLabel,
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -182,9 +184,16 @@ const UpdateTemplate: React.FC = () => {
         <Grid container spacing={3}>
           <Grid item xs={12} md={7}>
             <Paper sx={{ p: 3 }}>
-              <Typography variant="h4" gutterBottom>
-                Edit Template
-              </Typography>
+              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
+                <Typography variant="h4">Edit Template</Typography>
+                <Button
+                  variant="contained"
+                  onClick={() => navigate(`/view-template/${formData.id}`)}
+                >
+                  View Template
+                </Button>
+              </Box>
+
               {error && (
                 <Typography color="error" gutterBottom>
                   {error}
@@ -267,27 +276,48 @@ const UpdateTemplate: React.FC = () => {
                     </Typography>
                     {formData.examples.map((example, index) => (
                       <Box key={index} sx={{ mb: 2 }}>
-                        <TextField
-                          fullWidth
-                          label="User Input"
-                          value={example["User Input"]}
-                          onChange={(e) => {
-                            const newExamples = [...formData.examples];
-                            newExamples[index]["User Input"] = e.target.value;
-                            setFormData({ ...formData, examples: newExamples });
-                          }}
-                          sx={{ mb: 1 }}
-                        />
-                        <TextField
-                          fullWidth
-                          label="Expected Output"
-                          value={example["Expected Output"]}
-                          onChange={(e) => {
-                            const newExamples = [...formData.examples];
-                            newExamples[index]["Expected Output"] = e.target.value;
-                            setFormData({ ...formData, examples: newExamples });
-                          }}
-                        />
+                        <Box sx={{ mb: 1 }}>
+                          <InputLabel>User Input</InputLabel>
+                          <TextareaAutosize
+                            minRows={3}
+                            value={example["User Input"]}
+                            onChange={(e) => {
+                              const newExamples = [...formData.examples];
+                              newExamples[index]["User Input"] = e.target.value;
+                              setFormData({ ...formData, examples: newExamples });
+                            }}
+                            style={{
+                              width: "100%",
+                              padding: "8px",
+                              fontSize: "1rem",
+                              borderRadius: "4px",
+                              borderColor: "rgba(0, 0, 0, 0.23)",
+                              resize: "vertical",
+                              border: "1px solid rgba(0, 0, 0, 0.23)",
+                            }}
+                          />
+                        </Box>
+                        <Box sx={{ mb: 1 }}>
+                          <InputLabel>Expected Output</InputLabel>
+                          <TextareaAutosize
+                            minRows={3}
+                            value={example["Expected Output"]}
+                            onChange={(e) => {
+                              const newExamples = [...formData.examples];
+                              newExamples[index]["Expected Output"] = e.target.value;
+                              setFormData({ ...formData, examples: newExamples });
+                            }}
+                            style={{
+                              width: "100%",
+                              padding: "8px",
+                              fontSize: "1rem",
+                              borderRadius: "4px",
+                              borderColor: "rgba(0, 0, 0, 0.23)",
+                              resize: "vertical",
+                              border: "1px solid rgba(0, 0, 0, 0.23)",
+                            }}
+                          />
+                        </Box>
                       </Box>
                     ))}
                     <Button
@@ -322,6 +352,8 @@ const UpdateTemplate: React.FC = () => {
               </form>
             </Paper>
           </Grid>
+          
+          {/* Version History Card - Right Column */}
           <Grid item xs={12} md={5}>
             <VersionHistoryCard 
               history={versionHistory} 
