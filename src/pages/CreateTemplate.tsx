@@ -16,6 +16,7 @@ import {
   Select,
   MenuItem,
   FormHelperText,
+  TextareaAutosize,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import {
@@ -397,24 +398,46 @@ const CreateTemplate: React.FC = () => {
                 </Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="User Input"
-                      value={example["User Input"]}
-                      onChange={(e) => {
-                        updateExample(index, "User Input", e.target.value);
-                      }}
-                    />
+                    <Box sx={{ mb: 1 }}>
+                      <InputLabel>User Input</InputLabel>
+                      <TextareaAutosize
+                        minRows={3}
+                        value={example["User Input"]}
+                        onChange={(e) => {
+                          updateExample(index, "User Input", e.target.value);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "8px",
+                          fontSize: "1rem",
+                          borderRadius: "4px",
+                          borderColor: "rgba(0, 0, 0, 0.23)",
+                          resize: "vertical",
+                          border: "1px solid rgba(0, 0, 0, 0.23)",
+                        }}
+                      />
+                    </Box>
                   </Grid>
                   <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="Expected Output"
-                      value={example["Expected Output"]}
-                      onChange={(e) => {
-                        updateExample(index, "Expected Output", e.target.value);
-                      }}
-                    />
+                    <Box sx={{ mb: 1 }}>
+                      <InputLabel>Expected Output</InputLabel>
+                      <TextareaAutosize
+                        minRows={3}
+                        value={example["Expected Output"]}
+                        onChange={(e) => {
+                          updateExample(index, "Expected Output", e.target.value);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "8px",
+                          fontSize: "1rem",
+                          borderRadius: "4px",
+                          borderColor: "rgba(0, 0, 0, 0.23)",
+                          resize: "vertical",
+                          border: "1px solid rgba(0, 0, 0, 0.23)",
+                        }}
+                      />
+                    </Box>
                   </Grid>
                   <Grid item xs={12}>
                     <Button

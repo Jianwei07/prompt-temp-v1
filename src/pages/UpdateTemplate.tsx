@@ -13,7 +13,6 @@ import {
   DialogActions,
   CircularProgress,
   Grid,
-  Divider,
   Link,
   Alert,
 } from "@mui/material";
@@ -26,6 +25,7 @@ import {
 } from "../services/templateService";
 import Header from "../components/Header";
 import type { Template, VersionHistory } from "../types";
+import VersionHistoryCard from "../components/VersionHistory";
 
 const UpdateTemplate: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -179,166 +179,159 @@ const UpdateTemplate: React.FC = () => {
     <>
       <Header />
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h4" gutterBottom>
-            Edit Template
-          </Typography>
-          {error && (
-            <Typography color="error" gutterBottom>
-              {error}
-            </Typography>
-          )}
-          {message && (
-            <Typography color="success" gutterBottom>
-              {message}
-            </Typography>
-          )}
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Name"
-                  value={formData.name}
-                  InputProps={{
-                    readOnly: true,
-                  }}
-                  helperText="Template name cannot be changed"
-                  sx={{ 
-                    '& .MuiInputBase-input.Mui-readOnly': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.04)'
-                    }
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Department"
-                  value={formData.department}
-                  onChange={(e) =>
-                    setFormData({ ...formData, department: e.target.value })
-                  }
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="App Code"
-                  value={formData.appCode}
-                  onChange={(e) =>
-                    setFormData({ ...formData, appCode: e.target.value })
-                  }
-                  required
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Content"
-                  multiline
-                  rows={4}
-                  value={formData.content}
-                  onChange={(e) =>
-                    setFormData({ ...formData, content: e.target.value })
-                  }
-                  required
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Instructions"
-                  multiline
-                  rows={2}
-                  value={formData.instructions}
-                  onChange={(e) =>
-                    setFormData({ ...formData, instructions: e.target.value })
-                  }
-                  required
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Examples
-                </Typography>
-                {formData.examples.map((example, index) => (
-                  <Box key={index} sx={{ mb: 2 }}>
-                    <TextField
-                      fullWidth
-                      label="User Input"
-                      value={example["User Input"]}
-                      onChange={(e) => {
-                        const newExamples = [...formData.examples];
-                        newExamples[index]["User Input"] = e.target.value;
-                        setFormData({ ...formData, examples: newExamples });
-                      }}
-                      sx={{ mb: 1 }}
-                    />
-                    <TextField
-                      fullWidth
-                      label="Expected Output"
-                      value={example["Expected Output"]}
-                      onChange={(e) => {
-                        const newExamples = [...formData.examples];
-                        newExamples[index]["Expected Output"] = e.target.value;
-                        setFormData({ ...formData, examples: newExamples });
-                      }}
-                    />
-                  </Box>
-                ))}
-                <Button
-                  variant="outlined"
-                  onClick={() => {
-                    setFormData({
-                      ...formData,
-                      examples: [
-                        ...formData.examples,
-                        { "User Input": "", "Expected Output": "" },
-                      ],
-                    });
-                  }}
-                >
-                  Add Example
-                </Button>
-              </Grid>
-            </Grid>
-
-            <Box sx={{ mt: 3, display: "flex", gap: 2 }}>
-              <Button type="submit" variant="contained" disabled={isLoading}>
-                Save Changes
-              </Button>
-              <Button
-                variant="outlined"
-                color="error"
-                onClick={() => setOpenDeleteDialog(true)}
-              >
-                Delete Template
-              </Button>
-            </Box>
-          </form>
-
-          {versionHistory.length > 0 && (
-            <Box sx={{ mt: 4 }}>
-              <Typography variant="h6" gutterBottom>
-                Version History
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={7}>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h4" gutterBottom>
+                Edit Template
               </Typography>
-              <Divider sx={{ mb: 2 }} />
-              {versionHistory.map((version) => (
-                <Box key={version.commitId} sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2">
-                    Version {version.version} by {version.userDisplayName}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {new Date(version.timestamp).toLocaleString()}
-                  </Typography>
-                  <Typography variant="body2">{version.message}</Typography>
+              {error && (
+                <Typography color="error" gutterBottom>
+                  {error}
+                </Typography>
+              )}
+              {message && (
+                <Typography color="success" gutterBottom>
+                  {message}
+                </Typography>
+              )}
+              <form onSubmit={handleSubmit}>
+                <Grid container spacing={3}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Name"
+                      value={formData.name}
+                      InputProps={{
+                        readOnly: true,
+                      }}
+                      helperText="Template name cannot be changed"
+                      sx={{ 
+                        '& .MuiInputBase-input.Mui-readOnly': {
+                          backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                        }
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Department"
+                      value={formData.department}
+                      onChange={(e) =>
+                        setFormData({ ...formData, department: e.target.value })
+                      }
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="App Code"
+                      value={formData.appCode}
+                      onChange={(e) =>
+                        setFormData({ ...formData, appCode: e.target.value })
+                      }
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Content"
+                      multiline
+                      rows={4}
+                      value={formData.content}
+                      onChange={(e) =>
+                        setFormData({ ...formData, content: e.target.value })
+                      }
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Instructions"
+                      multiline
+                      rows={2}
+                      value={formData.instructions}
+                      onChange={(e) =>
+                        setFormData({ ...formData, instructions: e.target.value })
+                      }
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Examples
+                    </Typography>
+                    {formData.examples.map((example, index) => (
+                      <Box key={index} sx={{ mb: 2 }}>
+                        <TextField
+                          fullWidth
+                          label="User Input"
+                          value={example["User Input"]}
+                          onChange={(e) => {
+                            const newExamples = [...formData.examples];
+                            newExamples[index]["User Input"] = e.target.value;
+                            setFormData({ ...formData, examples: newExamples });
+                          }}
+                          sx={{ mb: 1 }}
+                        />
+                        <TextField
+                          fullWidth
+                          label="Expected Output"
+                          value={example["Expected Output"]}
+                          onChange={(e) => {
+                            const newExamples = [...formData.examples];
+                            newExamples[index]["Expected Output"] = e.target.value;
+                            setFormData({ ...formData, examples: newExamples });
+                          }}
+                        />
+                      </Box>
+                    ))}
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          examples: [
+                            ...formData.examples,
+                            { "User Input": "", "Expected Output": "" },
+                          ],
+                        });
+                      }}
+                    >
+                      Add Example
+                    </Button>
+                  </Grid>
+                </Grid>
+
+                <Box sx={{ mt: 3, display: "flex", gap: 2 }}>
+                  <Button type="submit" variant="contained" disabled={isLoading}>
+                    Save Changes
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={() => setOpenDeleteDialog(true)}
+                  >
+                    Delete Template
+                  </Button>
                 </Box>
-              ))}
-            </Box>
-          )}
-        </Paper>
+              </form>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} md={5}>
+            <VersionHistoryCard 
+              history={versionHistory} 
+              containerSx={{ 
+                position: "sticky",
+                top: 16
+              }} 
+            />
+          </Grid>
+        </Grid>
       </Container>
 
       {/* Enhanced Delete Dialog */}
