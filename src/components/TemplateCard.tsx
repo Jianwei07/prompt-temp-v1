@@ -18,14 +18,13 @@ import {
   DialogContentText,
   DialogTitle,
   IconButton,
-  Link,
   TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
 import React from "react";
 import { Link as RouterLink } from "react-router-dom";
-import useDeleteTemplate from "../hooks/useDeleteTemplate"; // Import the custom hook
+import useDeleteTemplate from "../hooks/useDeleteTemplate";
 import { Template } from "../types";
 
 interface TemplateCardProps {
@@ -36,7 +35,6 @@ interface TemplateCardProps {
 const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
   const {
     deleteStatus,
-    deletePrUrl,
     deleteMessage,
     error,
     deleteComment,
@@ -50,32 +48,32 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
       <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
         <CardContent sx={{ flexGrow: 1 }}>
           <Typography gutterBottom variant="h6" component="div">
-            {template.name}
+            {template.name || "Untitled"}
           </Typography>
 
           <Box sx={{ mb: 2 }}>
             <Chip
               icon={<BusinessIcon />}
-              label={template.department}
+              label={template.department || "Unknown Dept"}
               size="small"
               sx={{ mr: 1, mb: 1 }}
             />
             <Chip
               icon={<CodeIcon />}
-              label={template.appCode}
+              label={template.appCode || "No Code"}
               size="small"
               sx={{ mb: 1 }}
             />
           </Box>
 
           <Typography variant="body2" color="text.secondary" paragraph>
-            {template.content.substring(0, 80)}
-            {template.content.length > 80 ? "..." : ""}
+            {template.content?.substring(0, 80) || "No content"}
+            {template.content && template.content.length > 80 ? "..." : ""}
           </Typography>
 
           <Box sx={{ mt: 2 }}>
             <Chip
-              label={`v${template.version}`}
+              label={`v${template.version || "0.0.1"}`}
               size="small"
               variant="outlined"
             />
@@ -107,26 +105,35 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
             </Tooltip>
           </Box>
           <Tooltip title="Delete template">
-            <IconButton size="small" color="error" onClick={() => setDeleteComment("")}>
+            <IconButton
+              size="small"
+              color="error"
+              onClick={() => setDeleteComment("")}
+            >
               <DeleteIcon />
             </IconButton>
           </Tooltip>
         </CardActions>
       </Card>
 
-      {/* Enhanced Delete Dialog */}
       <Dialog
         open={deleteStatus !== "idle"}
-        onClose={deleteStatus === "loading" ? undefined : handleCloseDeleteDialog}
+        onClose={
+          deleteStatus === "loading" ? undefined : handleCloseDeleteDialog
+        }
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>{deleteStatus === "idle" ? "Confirm Delete" : "Delete Template"}</DialogTitle>
+        <DialogTitle>
+          {deleteStatus === "idle" ? "Confirm Delete" : "Delete Template"}
+        </DialogTitle>
         <DialogContent>
           {deleteStatus === "idle" && (
             <>
               <DialogContentText>
-                Are you sure you want to delete the template "{template.name}"? This action may require approval from a department administrator.
+                Are you sure you want to delete the template "{template.name}"?
+                This action may require approval from a department
+                administrator.
               </DialogContentText>
               <TextField
                 fullWidth
@@ -157,28 +164,6 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
               {deleteMessage || "Template deleted successfully!"}
             </Alert>
           )}
-
-          {deleteStatus === "pending_approval" && (
-            <>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                {deleteMessage || "Deletion request submitted for approval"}
-              </Alert>
-              <DialogContentText>
-                Your request to delete this template has been submitted and is awaiting approval from a department administrator.
-              </DialogContentText>
-              {deletePrUrl && (
-                <Box sx={{ mt: 2 }}>
-                  <Link
-                    href={deletePrUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    View pull request
-                  </Link>
-                </Box>
-              )}
-            </>
-          )}
         </DialogContent>
         <DialogActions>
           {deleteStatus === "idle" ? (
@@ -190,7 +175,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
             </>
           ) : (
             <Button onClick={handleCloseDeleteDialog} color="primary">
-              {deleteStatus === "pending_approval" || deleteStatus === "success" ? "Close" : "Cancel"}
+              {deleteStatus === "success" ? "Close" : "Cancel"}
             </Button>
           )}
         </DialogActions>

@@ -10,4 +10,4 @@ public class HealthController {
     public String health() {
         return "Application is running!";
     }
-} 
+}

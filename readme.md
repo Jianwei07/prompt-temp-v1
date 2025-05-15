@@ -1,31 +1,11 @@
-Parts to remove before going SIT
+Steps:
 
-1. NodeJS items
+1.  echo 'export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"' >> ~/.zshrc
+    echo 'export CPPFLAGS="-I/opt/homebrew/opt/openjdk@17/include"' >> ~/.zshrc
+    source ~/.zshrc
 
-- filter out expressjs in package.json
-- npm install express webpack-dev-middleware webpack-hot-middleware --save-dev (NOT INCLUDED)
-- server.js not in use
+2.  ./set-env.sh
 
-FOR TESTING
+# to start both frontend and backend
 
-- run both fronend and backend
-1. npm start 
-
-Steps: 
-
-1.
-echo 'export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"' >> ~/.zshrc
-echo 'export CPPFLAGS="-I/opt/homebrew/opt/openjdk@17/include"' >> ~/.zshrc
-source ~/.zshrc
-
-2.
-./set-env.sh
-
-3.
-mvn spring-boot:run
-
-4.
-npm run frontend
-
-
-
+3. npm run start-all

@@ -24,4 +24,4 @@ public class Template {
         private String userInput;
         private String expectedOutput;
     }
-} 
+}
