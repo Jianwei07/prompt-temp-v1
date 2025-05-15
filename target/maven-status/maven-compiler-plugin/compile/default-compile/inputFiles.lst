@@ -1,0 +1,8 @@
+/Users/mushroomyyy/Documents/Coding/Prompt Template/prompt-temp-v1/src/main/java/com/prompttemplate/api/model/Template.java
+/Users/mushroomyyy/Documents/Coding/Prompt Template/prompt-temp-v1/src/main/java/com/prompttemplate/api/controller/TemplateController.java
+/Users/mushroomyyy/Documents/Coding/Prompt Template/prompt-temp-v1/src/main/java/com/prompttemplate/api/config/WebConfig.java
+/Users/mushroomyyy/Documents/Coding/Prompt Template/prompt-temp-v1/src/main/java/com/prompttemplate/api/config/RestTemplateConfig.java
+/Users/mushroomyyy/Documents/Coding/Prompt Template/prompt-temp-v1/src/main/java/com/prompttemplate/api/PromptTemplateApplication.java
+/Users/mushroomyyy/Documents/Coding/Prompt Template/prompt-temp-v1/src/main/java/com/prompttemplate/api/controller/HealthController.java
+/Users/mushroomyyy/Documents/Coding/Prompt Template/prompt-temp-v1/src/main/java/com/prompttemplate/api/service/TemplateService.java
+/Users/mushroomyyy/Documents/Coding/Prompt Template/prompt-temp-v1/src/main/java/com/prompttemplate/api/service/BitbucketService.java

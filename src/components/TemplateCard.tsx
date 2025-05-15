@@ -1,97 +1,49 @@
-import React, { useState } from "react";
+import BusinessIcon from "@mui/icons-material/Business";
+import CodeIcon from "@mui/icons-material/Code";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import {
-  Card,
-  CardContent,
-  Typography,
+  Alert,
   Box,
-  Chip,
-  CardActions,
   Button,
+  Card,
+  CardActions,
+  CardContent,
+  Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
   IconButton,
-  Tooltip,
-  TextField,
-  Alert,
   Link,
-  CircularProgress,
+  TextField,
+  Tooltip,
+  Typography,
 } from "@mui/material";
+import React from "react";
 import { Link as RouterLink } from "react-router-dom";
+import useDeleteTemplate from "../hooks/useDeleteTemplate"; // Import the custom hook
 import { Template } from "../types";
-import CodeIcon from "@mui/icons-material/Code";
-import BusinessIcon from "@mui/icons-material/Business";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
-import VisibilityIcon from "@mui/icons-material/Visibility";
-import { deleteTemplate } from "../services/templateService";
 
 interface TemplateCardProps {
   template: Template;
-  onDelete?: () => void; // Optional callback for parent component to refresh
+  onDelete?: () => void;
 }
 
 const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
-  // New state variables for enhanced delete functionality, matching UpdateTemplate
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteComment, setDeleteComment] = useState("");
-  const [deleteStatus, setDeleteStatus] = useState<
-    "idle" | "loading" | "success" | "pending_approval" | "error"
-  >("idle");
-  const [deletePrUrl, setDeletePrUrl] = useState("");
-  const [deleteMessage, setDeleteMessage] = useState("");
-  const [error, setError] = useState("");
-
-  const handleDeleteClick = () => {
-    setDeleteDialogOpen(true);
-  };
-
-  const handleCloseDeleteDialog = () => {
-    // If deleted or pending approval, refresh the page
-    if (deleteStatus === "success" || deleteStatus === "pending_approval") {
-      if (onDelete) {
-        onDelete();
-      } else {
-        window.location.reload();
-      }
-    }
-
-    // Reset delete dialog state
-    setDeleteDialogOpen(false);
-    setDeleteComment("");
-    setDeleteStatus("idle");
-    setDeletePrUrl("");
-    setDeleteMessage("");
-    setError("");
-  };
-
-  // Enhanced delete functionality matching UpdateTemplate
-  const handleConfirmDelete = async () => {
-    setDeleteStatus("loading");
-    setError("");
-
-    try {
-      const result = await deleteTemplate(template.id, deleteComment);
-
-      if (result.status === "pending_approval") {
-        setDeleteStatus("pending_approval");
-        setDeletePrUrl(result.pullRequestUrl || "");
-        setDeleteMessage(
-          result.message || "Deletion request submitted for approval"
-        );
-      } else {
-        setDeleteStatus("success");
-        setDeleteMessage(result.message || "Template deleted successfully");
-      }
-    } catch (err) {
-      setDeleteStatus("error");
-      setError(
-        err instanceof Error ? err.message : "Failed to delete template"
-      );
-    }
-  };
+  const {
+    deleteStatus,
+    deletePrUrl,
+    deleteMessage,
+    error,
+    deleteComment,
+    setDeleteComment,
+    handleDelete,
+    handleCloseDeleteDialog,
+  } = useDeleteTemplate(template.id, onDelete);
 
   return (
     <>
@@ -155,31 +107,26 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
             </Tooltip>
           </Box>
           <Tooltip title="Delete template">
-            <IconButton size="small" color="error" onClick={handleDeleteClick}>
+            <IconButton size="small" color="error" onClick={() => setDeleteComment("")}>
               <DeleteIcon />
             </IconButton>
           </Tooltip>
         </CardActions>
       </Card>
 
-      {/* Enhanced Delete Dialog - matching UpdateTemplate */}
+      {/* Enhanced Delete Dialog */}
       <Dialog
-        open={deleteDialogOpen}
-        onClose={
-          deleteStatus === "loading" ? undefined : handleCloseDeleteDialog
-        }
+        open={deleteStatus !== "idle"}
+        onClose={deleteStatus === "loading" ? undefined : handleCloseDeleteDialog}
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>
-          {deleteStatus === "idle" ? "Confirm Delete" : "Delete Template"}
-        </DialogTitle>
+        <DialogTitle>{deleteStatus === "idle" ? "Confirm Delete" : "Delete Template"}</DialogTitle>
         <DialogContent>
           {deleteStatus === "idle" && (
             <>
               <DialogContentText>
-                Are you sure you want to delete the template "{template.name}"? This
-                action may require approval from a department administrator.
+                Are you sure you want to delete the template "{template.name}"? This action may require approval from a department administrator.
               </DialogContentText>
               <TextField
                 fullWidth
@@ -217,8 +164,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
                 {deleteMessage || "Deletion request submitted for approval"}
               </Alert>
               <DialogContentText>
-                Your request to delete this template has been submitted and is
-                awaiting approval from a department administrator.
+                Your request to delete this template has been submitted and is awaiting approval from a department administrator.
               </DialogContentText>
               {deletePrUrl && (
                 <Box sx={{ mt: 2 }}>
@@ -238,15 +184,13 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
           {deleteStatus === "idle" ? (
             <>
               <Button onClick={handleCloseDeleteDialog}>Cancel</Button>
-              <Button onClick={handleConfirmDelete} color="error" variant="contained">
+              <Button onClick={handleDelete} color="error" variant="contained">
                 Delete
               </Button>
             </>
           ) : (
             <Button onClick={handleCloseDeleteDialog} color="primary">
-              {deleteStatus === "pending_approval" || deleteStatus === "success"
-                ? "Close"
-                : "Cancel"}
+              {deleteStatus === "pending_approval" || deleteStatus === "success" ? "Close" : "Cancel"}
             </Button>
           )}
         </DialogActions>

@@ -11,3 +11,21 @@ FOR TESTING
 - run both fronend and backend
 1. npm start 
 
+Steps: 
+
+1.
+echo 'export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"' >> ~/.zshrc
+echo 'export CPPFLAGS="-I/opt/homebrew/opt/openjdk@17/include"' >> ~/.zshrc
+source ~/.zshrc
+
+2.
+./set-env.sh
+
+3.
+mvn spring-boot:run
+
+4.
+npm run frontend
+
+
+

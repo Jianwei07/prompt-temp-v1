@@ -16,339 +16,229 @@ const config = require("../webpack.config.js"); // Adjust path if needed
 const compiler = webpack(config);
 
 const app = express();
-app.use(cors());
+app.use(cors(), express.json());
 
-// For parsing JSON bodies
-app.use(express.json());
-
-// Near the top after imports, add this configuration object
+// Core configuration
 const CONFIG = {
-  // Bitbucket configuration
   bitbucket: {
     workspace: process.env.BITBUCKET_WORKSPACE,
     repoSlug: process.env.BITBUCKET_REPO,
     username: process.env.BITBUCKET_USERNAME || process.env.USERNAME || "System",
     accessToken: process.env.BITBUCKET_ACCESS_TOKEN,
   },
-  // Server configuration
   server: {
     port: process.env.PORT || 4000,
     frontendPort: 3000
   },
-  // Feature flags
   features: {
     requireDeleteApproval: process.env.REQUIRE_DELETE_APPROVAL === "true"
   }
 };
 
-// Validate essential configuration at startup
-function validateConfig() {
-  const missing = [];
-  if (!CONFIG.bitbucket.workspace) missing.push("BITBUCKET_WORKSPACE");
-  if (!CONFIG.bitbucket.repoSlug) missing.push("BITBUCKET_REPO");
-  if (!CONFIG.bitbucket.accessToken) missing.push("BITBUCKET_ACCESS_TOKEN");
+// Utility functions
+const utils = {
+  getSingaporeTime: () => {
+    const time = new Date();
+    time.setHours(time.getHours() + 8);
+    return time.toISOString();
+  },
   
-  if (missing.length > 0) {
-    console.error("ERROR: Missing required environment variables:", missing.join(", "));
-    console.error("Make sure these are set in your .env file.");
-    // Uncomment if you want to exit when environment variables are missing
-    // process.exit(1);
-    return false;
-  }
-  
-  console.log("Environment loaded successfully. Bitbucket config:", {
-    workspace: CONFIG.bitbucket.workspace,
-    repoSlug: CONFIG.bitbucket.repoSlug,
-    hasToken: !!CONFIG.bitbucket.accessToken,
-  });
-  
-  return true;
-}
-
-// Run validation at startup
-validateConfig();
-
-// Test endpoint to verify we're using server_new.js
-app.get("/api/test-server", (req, res) => {
-  res.json({
-    message: "This is from server_new.js",
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// Enable webpack-dev-middleware and webpack-hot-middleware
-app.use(
-  webpackDevMiddleware(compiler, {
-    publicPath: config.output.publicPath,
-    stats: { colors: true },
-  })
-);
-app.use(webpackHotMiddleware(compiler));
-
-// Helper function to get auth headers
-function getBitbucketAuthHeaders() {
-  return {
+  getAuthHeaders: () => ({
     Authorization: `Bearer ${CONFIG.bitbucket.accessToken}`,
     Accept: "application/json",
-  };
-}
+  }),
 
-// Helper function to fetch metadata with error handling
-async function fetchMetadata() {
-  const { workspace, repoSlug } = CONFIG.bitbucket;
-  
-  if (!workspace || !repoSlug) {
-    throw new Error("Missing Bitbucket workspace or repository information");
+  createFormData: (files, message, branch = "main") => {
+    const formData = new FormData();
+    formData.append("branch", branch);
+    formData.append("message", message);
+    Object.entries(files).forEach(([path, content]) => formData.append(path, content));
+    return formData;
+  },
+
+  validateFields: (data, fields) => {
+    const missing = fields.filter(field => !data[field]);
+    return missing.length > 0 
+      ? { valid: false, error: `Missing required fields: ${missing.join(', ')}` }
+      : { valid: true };
+  },
+
+  findTemplate: (metadata, id) => {
+    if (!Array.isArray(metadata)) return { found: false, error: "Invalid metadata format" };
+    const index = metadata.findIndex(item => String(item.id) === String(id));
+    return index === -1
+      ? { found: false, error: `Template with ID ${id} not found` }
+      : { found: true, templateMeta: metadata[index], templateIndex: index };
+  },
+
+  generateId: (metadata) => {
+    if (metadata.length === 0) return "1";
+    const highestId = metadata.reduce((max, template) => {
+      const id = parseInt(template.id, 10);
+      return !isNaN(id) && id > max ? id : max;
+    }, 0);
+    return (highestId + 1).toString();
+  },
+
+  incrementVersion: (version) => {
+    if (!version || typeof version !== "string") return "v1.1";
+    const match = version.match(/v(\d+)\.(\d+)/);
+    return match ? `v${match[1]}.${parseInt(match[2], 10) + 1}` : "v1.1";
   }
-  
-  const metadataUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src/main/metadata.json`;
-  console.log("Fetching metadata from:", metadataUrl);
-  
-  const metadataResponse = await fetch(metadataUrl, {
-    headers: getBitbucketAuthHeaders(),
-  });
-  
-  if (!metadataResponse.ok) {
-    if (metadataResponse.status === 404) {
-      console.log("Metadata file not found, will create new one");
+};
+
+// Bitbucket API functions
+const bitbucket = {
+  async fetchMetadata() {
+    const { workspace, repoSlug } = CONFIG.bitbucket;
+    if (!workspace || !repoSlug) throw new Error("Missing Bitbucket workspace or repository information");
+    
+    const response = await fetch(
+      `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src/main/metadata.json`,
+      { headers: utils.getAuthHeaders() }
+    );
+    
+    if (!response.ok) {
+      if (response.status === 404) return [];
+      throw new Error(`Failed to fetch metadata: ${response.status}`);
+    }
+    
+    try {
+      const metadata = JSON.parse(await response.text());
+      return Array.isArray(metadata) ? metadata : [];
+    } catch (error) {
+      console.error("Error parsing metadata JSON:", error);
       return [];
     }
-    throw new Error(`Failed to fetch metadata: ${metadataResponse.status}`);
-  }
-  
-  try {
-    const metadataText = await metadataResponse.text();
-    const metadata = JSON.parse(metadataText);
+  },
+
+  async commit(files, message, branch = "main") {
+    const { workspace, repoSlug, accessToken } = CONFIG.bitbucket;
+    if (!workspace || !repoSlug || !accessToken) throw new Error("Missing Bitbucket credentials");
     
-    if (!Array.isArray(metadata)) {
-      console.log("Metadata is not an array, resetting to empty array");
-      return [];
-    }
+    const formData = utils.createFormData(files, message, branch);
+    const response = await fetch(
+      `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData,
+      }
+    );
     
-    return metadata;
-  } catch (error) {
-    console.error("Error parsing metadata JSON:", error);
-    return [];
-  }
-}
+    if (!response.ok) throw new Error(`Bitbucket API error: ${response.status} - ${await response.text()}`);
+    return response;
+  },
 
-// Helper function to commit files to Bitbucket
-async function commitToBitbucket(files, commitMessage, branch = "main") {
-  const { workspace, repoSlug, accessToken } = CONFIG.bitbucket;
-  
-  if (!workspace || !repoSlug || !accessToken) {
-    throw new Error("Missing Bitbucket credentials");
-  }
-  
-  const formData = new FormData();
-  formData.append("branch", branch);
-  formData.append("message", commitMessage);
-  
-  // Add each file to the form data
-  for (const [path, content] of Object.entries(files)) {
-    formData.append(path, content);
-  }
-  
-  const apiUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src`;
-  console.log("Committing to Bitbucket:", apiUrl);
-  
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: formData,
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Bitbucket API error: ${response.status} - ${errorText}`);
-  }
-  
-  return response;
-}
-
-// Helper function to find template by ID in metadata
-function findTemplateInMetadata(metadata, id) {
-  if (!Array.isArray(metadata)) {
-    return { found: false, error: "Invalid metadata format" };
-  }
-  
-  const templateIndex = metadata.findIndex(item => String(item.id) === String(id));
-  
-  if (templateIndex === -1) {
-    return { found: false, error: `Template with ID ${id} not found` };
-  }
-  
-  return { 
-    found: true, 
-    templateMeta: metadata[templateIndex],
-    templateIndex
-  };
-}
-
-// Helper function to generate a new sequential ID
-function generateSequentialId(metadata) {
-  if (metadata.length === 0) {
-    return "1";
-  }
-  
-  const highestId = metadata.reduce((maxId, template) => {
-    const templateId = parseInt(template.id, 10);
-    return !isNaN(templateId) && templateId > maxId ? templateId : maxId;
-  }, 0);
-  
-  return (highestId + 1).toString();
-}
-
-// Helper function to increment version
-function incrementVersion(version) {
-  if (!version || typeof version !== "string") {
-    return "v1.1";
-  }
-  
-  const match = version.match(/v(\d+)\.(\d+)/);
-  if (!match) {
-    return "v1.1";
-  }
-  
-  const major = parseInt(match[1], 10);
-  const minor = parseInt(match[2], 10) + 1;
-  
-  return `v${major}.${minor}`;
-}
-
-// Helper function to fetch template content
-async function fetchTemplateContent(templatePath) {
-  const { workspace, repoSlug } = CONFIG.bitbucket;
-  
-  // Remove any leading slashes from the path
-  const normalizedPath = templatePath.startsWith('/') 
-    ? templatePath.substring(1) 
-    : templatePath;
-  
-  const templateUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src/main/${normalizedPath}`;
-  console.log("Fetching template from:", templateUrl);
-  
-  const templateResponse = await fetch(templateUrl, {
-    headers: getBitbucketAuthHeaders(),
-  });
-  
-  if (!templateResponse.ok) {
-    throw new Error(`Template file not found at ${normalizedPath}`);
-  }
-  
-  try {
-    return await templateResponse.json();
-  } catch (error) {
-    throw new Error("Invalid template format");
-  }
-}
-
-// Helper function to validate required fields
-function validateRequiredFields(data, fields) {
-  const missingFields = fields.filter(field => !data[field]);
-  
-  if (missingFields.length > 0) {
-    return {
-      valid: false,
-      error: `Missing required fields: ${missingFields.join(', ')}`
-    };
-  }
-  
-  return { valid: true };
-}
-
-// Update the template creation endpoint to fix the content structure
-app.post("/api/templates", async (req, res) => {
-  console.log(
-    "Received template creation request with data:",
-    JSON.stringify(req.body, null, 2)
-  );
-
-  try {
-    // Validate required fields
-    const { name, content, department, appCode, instructions, examples } = req.body;
-    const validation = validateRequiredFields(req.body, ["name", "content", "department", "appCode"]);
-    
-    if (!validation.valid) {
-      return res.status(400).json({
-        success: false,
-        error: validation.error,
-      });
-    }
-
-    // Format the examples correctly
-    let processedExamples = [];
-    if (examples && Array.isArray(examples)) {
-      processedExamples = examples.map((example) => {
-        if (example["User Input"] !== undefined && example["Expected Output"] !== undefined) {
-          return example;
+  async deleteFile(filePath, branch, message) {
+    const { workspace, repoSlug, accessToken } = CONFIG.bitbucket;
+    try {
+      const response = await fetch(
+        `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src/${branch}/${filePath}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ message, branch })
         }
-        return {
-          "User Input": example.input || example.userInput || example.question || "",
-          "Expected Output": example.output || example.expectedOutput || example.answer || "",
-        };
-      });
+      );
+      
+      if (!response.ok) {
+        await this.commit({ [filePath]: "" }, message, branch);
+        console.log("Successfully emptied the file as a deletion alternative");
+      } else {
+        console.log(`Successfully deleted file: ${filePath}`);
+      }
+    } catch (error) {
+      console.warn(`Error with file deletion request: ${error.message}`);
     }
+  },
 
-    // Get Singapore time (UTC+8)
-    const sgTimeString = getSingaporeTime();
+  async createBranch(branchName, baseBranch = "main") {
+    const { workspace, repoSlug, accessToken } = CONFIG.bitbucket;
+    const response = await fetch(
+      `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/refs/branches`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: branchName, target: { hash: baseBranch } })
+      }
+    );
+    
+    if (!response.ok) throw new Error(`Failed to create branch: ${await response.text()}`);
+    return response;
+  },
 
-    // Get username from config
-    const username = CONFIG.bitbucket.username;
+  async createPR(sourceBranch, title, description) {
+    const { workspace, repoSlug, accessToken } = CONFIG.bitbucket;
+    const response = await fetch(
+      `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/pullrequests`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description,
+          source: { branch: { name: sourceBranch } },
+          destination: { branch: { name: "main" } },
+          close_source_branch: true
+        })
+      }
+    );
+    
+    if (!response.ok) throw new Error(`Failed to create pull request: ${await response.text()}`);
+    return response.json();
+  }
+};
 
-    // Create paths and filenames
+// API Routes
+app.get("/api/test-server", (req, res) => {
+  res.json({ message: "This is from server_new.js", timestamp: new Date().toISOString() });
+});
+
+app.post("/api/templates", async (req, res) => {
+  try {
+    const { name, content, department, appCode, instructions, examples } = req.body;
+    const validation = utils.validateFields(req.body, ["name", "content", "department", "appCode"]);
+    if (!validation.valid) return res.status(400).json({ success: false, error: validation.error });
+
+    const processedExamples = examples?.map(example => ({
+      "User Input": example.input || example.userInput || example.question || "",
+      "Expected Output": example.output || example.expectedOutput || example.answer || ""
+    })) || [];
+
     const fileName = `${name.replace(/\s+/g, "-")}.json`;
     const filePath = `${department}/${appCode}/${fileName}`;
-    const link = `${department}/${appCode}/${fileName}`;
+    const metadata = await bitbucket.fetchMetadata();
+    const newId = utils.generateId(metadata);
+    const username = CONFIG.bitbucket.username;
+    const sgTimeString = utils.getSingaporeTime();
 
-    console.log("Template will be created at path:", filePath);
-    console.log("Link in metadata will be:", link);
-
-    // Fetch the current metadata
-    const metadata = await fetchMetadata();
-
-    // Generate sequential ID
-    const newId = generateSequentialId(metadata);
-    console.log(`Generated new sequential ID: ${newId} (based on ${metadata.length} existing templates)`);
-
-    // Create new metadata entry with all the metadata fields
     const newMetadataEntry = {
       id: newId,
       Department: department,
       AppCode: appCode,
-      name: name,
-      link: link,
+      name,
+      link: filePath,
       version: "v1.0",
       createdAt: sgTimeString,
       createdBy: username,
       updatedBy: "",
-      updatedAt: "",
+      updatedAt: ""
     };
 
-    // Add new entry to metadata
     metadata.push(newMetadataEntry);
-
-    // Create template content with ONLY the content fields, not duplicate metadata
-    const templateContent = {
-      "Main Prompt Content": content,
-      "Additional Instructions": instructions || "",
-      "Examples": processedExamples
-    };
-
-    // Commit to Bitbucket
-    const files = {
-      "metadata.json": JSON.stringify(metadata, null, 2),
-      [filePath]: JSON.stringify(templateContent, null, 2)
-    };
-    
-    await commitToBitbucket(
-      files, 
+    await bitbucket.commit(
+      {
+        "metadata.json": JSON.stringify(metadata, null, 2),
+        [filePath]: JSON.stringify({
+          "Main Prompt Content": content,
+          "Additional Instructions": instructions || "",
+          "Examples": processedExamples
+        }, null, 2)
+      },
       `Creating new template: ${name} in ${department}/${appCode}`
     );
 
-    // Return the template with all fields for the frontend
     res.json({
       success: true,
       template: {
@@ -363,8 +253,8 @@ app.post("/api/templates", async (req, res) => {
         createdAt: sgTimeString,
         createdBy: username,
         updatedAt: sgTimeString,
-        updatedBy: username,
-      },
+        updatedBy: username
+      }
     });
   } catch (err) {
     console.error("Error in /api/templates endpoint:", err);
@@ -376,7 +266,7 @@ app.post("/api/templates", async (req, res) => {
 app.get("/api/templates", async (req, res) => {
   try {
     // Fetch metadata
-    const metadata = await fetchMetadata();
+    const metadata = await bitbucket.fetchMetadata();
     
     // Return the templates directly from metadata
     const templates = metadata.map((entry) => ({
@@ -407,10 +297,10 @@ app.get("/api/templates/:id", async (req, res) => {
 
   try {
     // Fetch metadata
-    const metadata = await fetchMetadata();
+    const metadata = await bitbucket.fetchMetadata();
     
     // Find template in metadata
-    const result = findTemplateInMetadata(metadata, id);
+    const result = utils.findTemplate(metadata, id);
     if (!result.found) {
       return res.status(404).json({
         success: false,
@@ -463,7 +353,7 @@ async function fetchRepositoryStructure() {
   // First, list the contents of the repository root
   const apiUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src/main/`;
   const response = await fetch(apiUrl, {
-    headers: getBitbucketAuthHeaders(),
+    headers: utils.getAuthHeaders(),
   });
 
   if (!response.ok) {
@@ -495,7 +385,7 @@ async function fetchRepositoryStructure() {
     
     try {
       const deptResponse = await fetch(deptUrl, {
-        headers: getBitbucketAuthHeaders(),
+        headers: utils.getAuthHeaders(),
       });
 
       if (deptResponse.ok) {
@@ -563,7 +453,7 @@ app.put("/api/templates/:id", async (req, res) => {
     const { content, department, appCode, instructions, examples } = req.body;
     
     // Validate required fields (excluding name since it shouldn't change)
-    const validation = validateRequiredFields(req.body, ["content", "department", "appCode"]);
+    const validation = utils.validateFields(req.body, ["content", "department", "appCode"]);
     if (!validation.valid) {
       return res.status(400).json({
         success: false,
@@ -572,10 +462,10 @@ app.put("/api/templates/:id", async (req, res) => {
     }
 
     // Fetch metadata
-    const metadata = await fetchMetadata();
+    const metadata = await bitbucket.fetchMetadata();
     
     // Find template in metadata
-    const result = findTemplateInMetadata(metadata, id);
+    const result = utils.findTemplate(metadata, id);
     if (!result.found) {
       return res.status(404).json({
         success: false,
@@ -594,7 +484,7 @@ app.put("/api/templates/:id", async (req, res) => {
     }
 
     // Get Singapore time (UTC+8)
-    const sgTimeString = getSingaporeTime();
+    const sgTimeString = utils.getSingaporeTime();
 
     // Use the original name from the metadata record
     const originalName = templateMeta.name;
@@ -604,7 +494,7 @@ app.put("/api/templates/:id", async (req, res) => {
 
     // Update version in metadata
     const newVersion = templateMeta.version
-      ? incrementVersion(templateMeta.version)
+      ? utils.incrementVersion(templateMeta.version)
       : "v1.1";
 
     // Create template content with ONLY the content fields
@@ -633,7 +523,7 @@ app.put("/api/templates/:id", async (req, res) => {
       [templateMeta.link]: JSON.stringify(templateContent, null, 2)
     };
     
-    await commitToBitbucket(
+    await bitbucket.commit(
       files, 
       `Updated template: ${originalName} (ID: ${id})`
     );
@@ -665,76 +555,59 @@ app.put("/api/templates/:id", async (req, res) => {
   }
 });
 
-// Helper function to create a branch for PR workflows
-async function createBitbucketBranch(branchName, baseBranch = "main") {
-  const { workspace, repoSlug, accessToken } = CONFIG.bitbucket;
+// Helper function to fetch template content
+async function fetchTemplateContent(templatePath) {
+  const { workspace, repoSlug } = CONFIG.bitbucket;
   
-  const createBranchUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/refs/branches`;
-
-  const response = await fetch(createBranchUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      name: branchName,
-      target: {
-        hash: baseBranch,
-      },
-    }),
+  // Remove any leading slashes from the path
+  const normalizedPath = templatePath.startsWith('/') 
+    ? templatePath.substring(1) 
+    : templatePath;
+  
+  const templateUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src/main/${normalizedPath}`;
+  console.log("Fetching template from:", templateUrl);
+  
+  const templateResponse = await fetch(templateUrl, {
+    headers: utils.getAuthHeaders(),
   });
   
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to create branch: ${errorText}`);
+  if (!templateResponse.ok) {
+    throw new Error(`Template file not found at ${normalizedPath}`);
   }
   
-  return response;
+  try {
+    return await templateResponse.json();
+  } catch (error) {
+    throw new Error("Invalid template format");
+  }
 }
 
-// Helper function to create a pull request
-async function createPullRequest(sourceBranch, title, description) {
-  const { workspace, repoSlug, accessToken } = CONFIG.bitbucket;
-  
-  const createPrUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/pullrequests`;
-
-  const response = await fetch(createPrUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      title: title,
-      description: description,
-      source: {
-        branch: {
-          name: sourceBranch,
-        },
-      },
-      destination: {
-        branch: {
-          name: "main",
-        },
-      },
-      close_source_branch: true,
-    }),
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to create pull request: ${errorText}`);
+// Helper function to handle PR webhook events
+async function handlePrWebhookEvent(data) {
+  if (data.pullrequest?.title?.startsWith("Delete Template:")) {
+    console.log("Processing completed deletion PR:", data.pullrequest.id);
+    
+    const prDescription = data.pullrequest.description;
+    const idMatch = prDescription.match(/template ID (\d+)/);
+    const filePathMatch = prDescription.match(/template file at ([^\s.]+)/);
+    
+    if (idMatch && idMatch[1] && filePathMatch && filePathMatch[1]) {
+      const templateId = idMatch[1];
+      const filePath = filePathMatch[1];
+      
+      console.log(`PR approved for deletion of template ID: ${templateId}`);
+      console.log(`Need to delete file at: ${filePath}`);
+      
+      await bitbucket.deleteFile(filePath, "main", `Deleted template file after PR approval (ID: ${templateId})`);
+    }
   }
-  
-  return await response.json();
 }
 
 // Helper for handling template deletion logic
 async function deleteTemplate(id, requestComment, requireApproval) {
   // Get metadata and find template
-  const metadata = await fetchMetadata();
-  const result = findTemplateInMetadata(metadata, id);
+  const metadata = await bitbucket.fetchMetadata();
+  const result = utils.findTemplate(metadata, id);
   
   if (!result.found) {
     throw new Error(`Template with ID ${id} not found`);
@@ -756,11 +629,11 @@ async function deleteTemplate(id, requestComment, requireApproval) {
     const branchName = `delete-template-${id}-${timestamp}`;
     
     // Create branch
-    await createBitbucketBranch(branchName);
+    await bitbucket.createBranch(branchName);
     
     // First commit: Update metadata to remove template entry
     console.log("Step 1: Creating commit to update metadata.json");
-    await commitToBitbucket(
+    await bitbucket.commit(
       {
         "metadata.json": JSON.stringify(updatedMetadata, null, 2)
       },
@@ -769,55 +642,10 @@ async function deleteTemplate(id, requestComment, requireApproval) {
     );
     
     console.log("Step 2: Creating commit to delete the template file");
+    await bitbucket.deleteFile(templateMeta.link, branchName, `Delete template file: ${templateMeta.name} (ID: ${id})`);
     
-    // For Bitbucket, we need to make an explicit DELETE request to the file endpoint
-    // This is the most reliable way to delete a file with the Bitbucket REST API
-    const deleteFileUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src/${branchName}/${templateMeta.link}`;
-    console.log(`Making DELETE request to ${deleteFileUrl}`);
-    
-    try {
-      const deleteResponse = await fetch(deleteFileUrl, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: `Delete template file: ${templateMeta.name} (ID: ${id})`,
-          branch: branchName
-        })
-      });
-      
-      if (!deleteResponse.ok) {
-        console.warn(`Warning: File deletion request failed with status ${deleteResponse.status}`);
-        const errorText = await deleteResponse.text();
-        console.warn(`Error details: ${errorText}`);
-        
-        // Another approach: let's try to create an empty file
-        console.log("Trying simpler deletion approach by writing an empty file...");
-        
-        try {
-          // In Bitbucket, "deleting" a file can be achieved by committing an empty file
-          await commitToBitbucket(
-            {
-              [templateMeta.link]: ""  // Empty string to create an empty file (effectively deleting content)
-            },
-            `Empty template file for deletion: ${templateMeta.name} (ID: ${id})`,
-            branchName
-          );
-          console.log("Successfully emptied the file as a deletion alternative");
-        } catch (fallbackError) {
-          console.warn(`Fallback emptying also failed: ${fallbackError.message}`);
-        }
-      } else {
-        console.log(`Successfully deleted file in branch: ${templateMeta.link}`);
-      }
-    } catch (fileError) {
-      console.warn(`Error with file deletion request: ${fileError.message}`);
-    }
-    
-    // Create a PR for approval that includes both the metadata update and file deletion
-    const prData = await createPullRequest(
+    // Create a PR for approval
+    const prData = await bitbucket.createPR(
       branchName,
       `Delete Template: ${templateMeta.name}`,
       `Deletion request for template ID ${id}.\n\nRequested by: ${username}\nComment: ${
@@ -834,53 +662,14 @@ async function deleteTemplate(id, requestComment, requireApproval) {
     };
   } else {
     // Direct deletion without PR
-    
-    // First, update metadata
-    await commitToBitbucket(
+    await bitbucket.commit(
       {
         "metadata.json": JSON.stringify(updatedMetadata, null, 2)
       },
       `Delete template metadata: ${templateMeta.name} (ID: ${id})`
     );
     
-    // Then, delete the template file using direct DELETE request
-    const deleteFileUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src/main/${templateMeta.link}`;
-    
-    try {
-      const deleteResponse = await fetch(deleteFileUrl, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: `Delete template file: ${templateMeta.name} (ID: ${id})`,
-          branch: "main"
-        })
-      });
-      
-      if (!deleteResponse.ok) {
-        console.warn(`Warning: File deletion request failed with status ${deleteResponse.status}`);
-        
-        // Fallback - emptying the file
-        try {
-          await commitToBitbucket(
-            {
-              [templateMeta.link]: ""  // Empty string to create an empty file
-            },
-            `Empty template file for deletion: ${templateMeta.name} (ID: ${id})`,
-            "main"
-          );
-          console.log("Successfully emptied the file as a deletion alternative");
-        } catch (fallbackError) {
-          console.warn(`Fallback emptying also failed: ${fallbackError.message}`);
-        }
-      } else {
-        console.log(`Successfully deleted file: ${templateMeta.link}`);
-      }
-    } catch (fileError) {
-      console.warn(`Error with file deletion request: ${fileError.message}`);
-    }
+    await bitbucket.deleteFile(templateMeta.link, "main", `Delete template file: ${templateMeta.name} (ID: ${id})`);
     
     return {
       success: true,
@@ -922,8 +711,8 @@ app.get("/api/templates/:id/history", async (req, res) => {
 
   try {
     // First, get the template metadata to find its file path
-    const metadata = await fetchMetadata();
-    const result = findTemplateInMetadata(metadata, id);
+    const metadata = await bitbucket.fetchMetadata();
+    const result = utils.findTemplate(metadata, id);
     
     if (!result.found || !result.templateMeta.link) {
       console.log(`Template with ID ${id} not found or missing link`);
@@ -948,7 +737,7 @@ app.get("/api/templates/:id/history", async (req, res) => {
     console.log(`Fetching file history from: ${fileHistoryUrl}`);
     
     const historyResponse = await fetch(fileHistoryUrl, {
-      headers: getBitbucketAuthHeaders(),
+      headers: utils.getAuthHeaders(),
     });
 
     if (!historyResponse.ok) {
@@ -962,7 +751,7 @@ app.get("/api/templates/:id/history", async (req, res) => {
           commitId: "initial",
           version: "v1.0",
           userDisplayName: templateMeta.createdBy || "Unknown",
-          timestamp: templateMeta.createdAt || getSingaporeTime(),
+          timestamp: templateMeta.createdAt || utils.getSingaporeTime(),
           message: "Initial version"
         }],
         note: "Using placeholder history as actual file history could not be retrieved."
@@ -980,7 +769,7 @@ app.get("/api/templates/:id/history", async (req, res) => {
           commitId: "initial",
           version: "v1.0",
           userDisplayName: templateMeta.createdBy || "Unknown",
-          timestamp: templateMeta.createdAt || getSingaporeTime(),
+          timestamp: templateMeta.createdAt || utils.getSingaporeTime(),
           message: "Initial version"
         }]
       });
@@ -1022,7 +811,7 @@ app.get("/api/templates/:id/history", async (req, res) => {
         commitId: "initial",
         version: "v1.0",
         userDisplayName: templateMeta.createdBy || "Unknown",
-        timestamp: templateMeta.createdAt || getSingaporeTime(),
+        timestamp: templateMeta.createdAt || utils.getSingaporeTime(),
         message: "Initial version"
       });
     }
@@ -1041,7 +830,7 @@ app.get("/api/templates/:id/history", async (req, res) => {
         commitId: "error",
         version: "v1.0",
         userDisplayName: "System",
-        timestamp: getSingaporeTime(),
+        timestamp: utils.getSingaporeTime(),
         message: "Could not retrieve version history"
       }],
       note: "Error occurred while fetching version history"
@@ -1049,7 +838,7 @@ app.get("/api/templates/:id/history", async (req, res) => {
   }
 });
 
-// Update the webhook handler
+// Update the webhook handler to use the new helper
 app.post("/api/webhooks/bitbucket", async (req, res) => {
   const event = req.headers["x-event-key"];
   const data = req.body;
@@ -1057,53 +846,8 @@ app.post("/api/webhooks/bitbucket", async (req, res) => {
   console.log(`Received Bitbucket webhook: ${event}`);
 
   try {
-    // Handle PR merged events for template deletion
-    if (
-      event === "pullrequest:fulfilled" &&
-      data.pullrequest?.title?.startsWith("Delete Template:")
-    ) {
-      console.log("Processing completed deletion PR:", data.pullrequest.id);
-      
-      const prDescription = data.pullrequest.description;
-      const idMatch = prDescription.match(/template ID (\d+)/);
-      const filePathMatch = prDescription.match(/template file at ([^\s.]+)/);
-      
-      if (idMatch && idMatch[1] && filePathMatch && filePathMatch[1]) {
-        const templateId = idMatch[1];
-        const filePath = filePathMatch[1];
-        
-        console.log(`PR approved for deletion of template ID: ${templateId}`);
-        console.log(`Need to delete file at: ${filePath}`);
-        
-        try {
-          // Try to delete the template file after the PR is merged
-          const { workspace, repoSlug, accessToken } = CONFIG.bitbucket;
-          
-          const deleteFormData = new FormData();
-          deleteFormData.append("message", `Deleted template file after PR approval (ID: ${templateId})`);
-          deleteFormData.append("branch", "main");
-          // Using special syntax to delete
-          deleteFormData.append(`${filePath}`, "");
-          
-          const deleteUrl = `https://api.bitbucket.org/2.0/repositories/${workspace}/${repoSlug}/src`;
-          
-          const deleteResponse = await fetch(deleteUrl, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-            body: deleteFormData
-          });
-          
-          if (deleteResponse.ok) {
-            console.log(`Successfully deleted template file after PR approval: ${filePath}`);
-          } else {
-            console.warn(`Warning: Could not delete file after PR approval. Status: ${deleteResponse.status}`);
-          }
-        } catch (fileError) {
-          console.error(`Error deleting template file after PR approval: ${fileError.message}`);
-        }
-      }
+    if (event === "pullrequest:fulfilled") {
+      await handlePrWebhookEvent(data);
     }
   } catch (err) {
     console.error("Error processing webhook:", err);
@@ -1121,37 +865,16 @@ app.use("/api", (req, res) => {
 // Serve static files from the public directory
 app.use(express.static(path.join(__dirname, "../public")));
 
-const PORT = CONFIG.server.port;
-
-// Start the frontend webpack server in a separate process
+// Start servers
 const startFrontend = () => {
   const frontend = exec(`webpack serve --mode development --port ${CONFIG.server.frontendPort}`);
-  
-  frontend.stdout.on('data', (data) => {
-    console.log(`Frontend: ${data}`);
-  });
-  
-  frontend.stderr.on('data', (data) => {
-    console.error(`Frontend error: ${data}`);
-  });
-  
-  frontend.on('close', (code) => {
-    console.log(`Frontend process exited with code ${code}`);
-  });
+  frontend.stdout.on('data', console.log);
+  frontend.stderr.on('data', console.error);
+  frontend.on('close', code => console.log(`Frontend process exited with code ${code}`));
 };
 
-// Start the frontend
 startFrontend();
-
-// Start the backend
-app.listen(PORT, () => {
-  console.log(`Backend server running at http://localhost:${PORT}`);
+app.listen(CONFIG.server.port, () => {
+  console.log(`Backend server running at http://localhost:${CONFIG.server.port}`);
   console.log(`Frontend should be available at http://localhost:${CONFIG.server.frontendPort}`);
 });
-
-// Add this helper function near the other helpers
-function getSingaporeTime() {
-  const sgTime = new Date();
-  sgTime.setHours(sgTime.getHours() + 8); // Add 8 hours for Singapore time (UTC+8)
-  return sgTime.toISOString();
-}

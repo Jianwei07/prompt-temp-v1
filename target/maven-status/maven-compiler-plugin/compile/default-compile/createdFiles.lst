@@ -1,0 +1,8 @@
+com/prompttemplate/api/controller/HealthController.class
+com/prompttemplate/api/model/Template$Example.class
+com/prompttemplate/api/config/WebConfig.class
+com/prompttemplate/api/config/RestTemplateConfig.class
+com/prompttemplate/api/service/BitbucketService.class
+com/prompttemplate/api/PromptTemplateApplication.class
+com/prompttemplate/api/service/TemplateService.class
+com/prompttemplate/api/model/Template.class

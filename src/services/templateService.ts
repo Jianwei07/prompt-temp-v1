@@ -1,10 +1,10 @@
 import {
-  Template,
   Activity,
-  User,
-  CreateTemplateData,
-  UpdateTemplateData,
   ApiLog,
+  CreateTemplateData,
+  Template,
+  UpdateTemplateData,
+  User,
   VersionHistory,
 } from "../types";
 
@@ -91,10 +91,12 @@ import {
 //   },
 // ];
 
+const API_BASE_URL = 'http://localhost:8080/api';
+
 // Export logToBackend so it can be used elsewhere
 export const logToBackend = async (log: ApiLog): Promise<void> => {
   try {
-    await fetch("http://localhost:4000/api/logs", {
+    await fetch(`${API_BASE_URL}/logs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -108,7 +110,7 @@ export const logToBackend = async (log: ApiLog): Promise<void> => {
 };
 
 export async function getTemplates(): Promise<Template[]> {
-  const response = await fetch("http://localhost:4000/api/templates");
+  const response = await fetch(`${API_BASE_URL}/templates`);
   if (!response.ok) {
     const errorText = await response.text();
     console.error("Error fetching templates:", response.status, errorText);
@@ -119,7 +121,7 @@ export async function getTemplates(): Promise<Template[]> {
 }
 
 export async function getTemplate(id: string): Promise<Template> {
-  const response = await fetch(`http://localhost:4000/api/templates/${id}`);
+  const response = await fetch(`${API_BASE_URL}/templates/${id}`);
   if (!response.ok) {
     const errorText = await response.text();
     console.error("Error fetching template:", response.status, errorText);
@@ -131,7 +133,7 @@ export async function getTemplate(id: string): Promise<Template> {
 export async function createTemplate(
   data: CreateTemplateData
 ): Promise<Template> {
-  const response = await fetch("http://localhost:4000/api/templates", {
+  const response = await fetch(`${API_BASE_URL}/templates`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -161,7 +163,7 @@ export async function updateTemplate(
   console.log("Updating template with data:", data);
 
   const response = await fetch(
-    `http://localhost:4000/api/templates/${data.id}`,
+    `${API_BASE_URL}/templates/${data.id}`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -200,7 +202,7 @@ export async function deleteTemplate(
   pullRequestUrl?: string;
   message?: string;
 }> {
-  const response = await fetch(`http://localhost:4000/api/templates/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/templates/${id}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
@@ -227,7 +229,7 @@ export async function deleteTemplate(
 }
 
 export async function getRecentActivities(): Promise<Activity[]> {
-  const response = await fetch("http://localhost:4000/api/activities");
+  const response = await fetch(`${API_BASE_URL}/activities`);
   if (!response.ok) {
     console.error("Error fetching activities:", response.status);
     return [];
@@ -236,7 +238,7 @@ export async function getRecentActivities(): Promise<Activity[]> {
 }
 
 export const getUsers = async (): Promise<User[]> => {
-  const response = await fetch("http://localhost:4000/api/users");
+  const response = await fetch(`${API_BASE_URL}/users`);
   if (!response.ok) {
     console.error("Error fetching users:", response.status);
     return [
@@ -257,7 +259,7 @@ export async function getVersionHistory(
 ): Promise<VersionHistory[]> {
   try {
     const response = await fetch(
-      `http://localhost:4000/api/templates/${templateId}/history`
+      `${API_BASE_URL}/templates/${templateId}/history`
     );
 
     if (!response.ok) {
@@ -298,7 +300,7 @@ export async function getBitbucketStructure(): Promise<{
   try {
     console.log("Fetching Bitbucket structure...");
     const response = await fetch(
-      "http://localhost:4000/api/bitbucket/structure"
+      `${API_BASE_URL}/bitbucket/structure`
     );
 
     console.log("Response status:", response.status);

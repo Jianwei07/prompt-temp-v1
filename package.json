@@ -18,10 +18,14 @@
     "react-router-dom": "^6.14.2"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/react-hooks": "^8.0.1",
     "@types/node": "^20.17.30",
     "css-loader": "^6.7.4",
     "express": "^5.1.0",
     "html-webpack-plugin": "^5.5.1",
+    "jest": "^29.7.0",
     "style-loader": "^3.3.3",
     "ts-loader": "^9.5.0",
     "ts-node": "^10.9.2",
@@ -37,7 +41,7 @@
     "dev": "nodemon src/server_new.js",
     "frontend": "webpack serve --mode development --port 3000",
     "build": "webpack --mode production",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "type-check": "tsc --noEmit"
   },
   "browserslist": {
