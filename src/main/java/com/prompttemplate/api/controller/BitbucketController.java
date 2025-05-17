@@ -1,11 +1,19 @@
 package com.prompttemplate.api.controller;
 
-import com.prompttemplate.api.service.BitbucketService;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
+import com.prompttemplate.api.service.BitbucketService;
 
 @RestController
 @RequestMapping("/api/bitbucket")
@@ -26,6 +34,17 @@ public class BitbucketController {
             return ResponseEntity.status(500).body(Map.of("success", false, "error", e.getMessage()));
         }
     }
+
+    @GetMapping("/appcodes")
+public ResponseEntity<?> getAppCodesByDepartment(@RequestParam String department) {
+    try {
+        var appCodes = bitbucketService.getAppCodesByDepartment(department);
+        return ResponseEntity.ok(Map.of("success", true, "appCodes", appCodes));
+    } catch (Exception e) {
+        return ResponseEntity.status(500).body(Map.of("success", false, "error", e.getMessage()));
+    }
+}
+
 
     // Optional: Webhook endpoint. Remove if not used by your CI/CD/Bitbucket
     // automation.

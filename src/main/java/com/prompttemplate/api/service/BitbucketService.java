@@ -349,6 +349,8 @@ public Template createTemplate(Map<String, Object> payload) throws Exception {
         return List.of();
     }
 
+    
+
     @SuppressWarnings("unchecked")
     public void handleWebhookEvent(String event, Map<String, Object> body) {
         if (!"pullrequest:fulfilled".equals(event))
@@ -374,3 +376,4 @@ public Template createTemplate(Map<String, Object> payload) throws Exception {
         }
     }
 }
+
