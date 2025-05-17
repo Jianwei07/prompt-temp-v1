@@ -1,6 +1,7 @@
 package com.prompttemplate.api.model;
 
 import lombok.Data;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -10,18 +11,18 @@ public class Template {
     private String name;
     private String department;
     private String appCode;
+    private String version;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private String createdBy;
+    private String updatedBy;
     private String content;
     private String instructions;
     private List<Example> examples;
-    private String version;
-    private LocalDateTime createdAt;
-    private String createdBy;
-    private LocalDateTime updatedAt;
-    private String updatedBy;
 
     @Data
     public static class Example {
-        private String userInput;
-        private String expectedOutput;
+        private String input;
+        private String output;
     }
 }
