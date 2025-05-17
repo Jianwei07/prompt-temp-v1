@@ -1,22 +1,33 @@
 package com.prompttemplate.api.service;
 
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.prompttemplate.api.model.Template;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.*;
-import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
-
-import java.time.LocalDateTime;
-import java.time.ZonedDateTime;
-import java.util.*;
 
 @Service
 public class BitbucketService {
@@ -102,53 +113,53 @@ public class BitbucketService {
     }
 
     // 3. Create template
-    public Template createTemplate(Map<String, Object> payload) throws Exception {
-        String id = UUID.randomUUID().toString();
-        String now = ZonedDateTime.now().toString();
+public Template createTemplate(Map<String, Object> payload) throws Exception {
+    String id = UUID.randomUUID().toString();
+    String now = ZonedDateTime.now().toString();
 
-        ObjectNode newNode = objectMapper.createObjectNode();
-        newNode.put("id", id);
-        newNode.put("name", (String) payload.get("name"));
-        newNode.put("Department", (String) payload.get("department"));
-        newNode.put("AppCode", (String) payload.get("appCode"));
-        newNode.put("version", (String) payload.getOrDefault("version", "v1.0"));
-        newNode.put("createdBy", (String) payload.getOrDefault("createdBy", username));
-        newNode.put("updatedBy", (String) payload.getOrDefault("createdBy", username));
-        newNode.put("createdAt", now);
-        newNode.put("updatedAt", now);
-        newNode.put("link", "templates/" + id + ".json");
+    ObjectNode newNode = objectMapper.createObjectNode();
+    newNode.put("id", id);
+    newNode.put("name", (String) payload.get("name"));
+    newNode.put("Department", (String) payload.get("department"));
+    newNode.put("AppCode", (String) payload.get("appCode"));
+    newNode.put("version", (String) payload.getOrDefault("version", "v1.0"));
+    newNode.put("createdBy", (String) payload.getOrDefault("createdBy", username));
+    newNode.put("updatedBy", (String) payload.getOrDefault("createdBy", username));
+    newNode.put("createdAt", now);
+    newNode.put("updatedAt", now);
+    newNode.put("link", "templates/" + id + ".json");
 
-        ArrayNode metadata = (ArrayNode) fetchMetadata();
-        metadata.add(newNode);
+    ArrayNode metadata = (ArrayNode) fetchMetadata();
+    metadata.add(newNode);
 
-        ObjectNode fileContent = objectMapper.createObjectNode();
-        fileContent.put("Main Prompt Content", (String) payload.getOrDefault("content", ""));
-        fileContent.put("Additional Instructions", (String) payload.getOrDefault("instructions", ""));
-        fileContent.set("Examples", objectMapper.valueToTree(payload.getOrDefault("examples", List.of())));
+    ObjectNode fileContent = objectMapper.createObjectNode();
+    fileContent.put("Main Prompt Content", (String) payload.getOrDefault("content", ""));
+    fileContent.put("Additional Instructions", (String) payload.getOrDefault("instructions", ""));
+    fileContent.set("Examples", objectMapper.valueToTree(payload.getOrDefault("examples", List.of())));
 
-        Map<String, String> files = Map.of(
-                "metadata.json", objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(metadata),
-                "templates/" + id + ".json",
-                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(fileContent));
+    Map<String, String> files = Map.of(
+            "metadata.json", objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(metadata),
+            "templates/" + id + ".json",
+            objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(fileContent));
 
-        commitFiles("Create template " + id, files);
+    commitFiles("Create template " + id, files);
 
-        Template created = new Template();
-        created.setId(id);
-        created.setName(newNode.get("name").asText());
-        created.setDepartment(newNode.get("Department").asText());
-        created.setAppCode(newNode.get("AppCode").asText());
-        created.setVersion(newNode.get("version").asText());
-        created.setCreatedAt(ZonedDateTime.parse(now).toLocalDateTime());
-        created.setUpdatedAt(ZonedDateTime.parse(now).toLocalDateTime());
-        created.setCreatedBy(username);
-        created.setUpdatedBy(username);
-        created.setContent(fileContent.get("Main Prompt Content").asText());
-        created.setInstructions(fileContent.get("Additional Instructions").asText());
-        created.setExamples(objectMapper.convertValue(fileContent.get("Examples"), new TypeReference<>() {
-        }));
-        return created;
-    }
+    Template created = new Template();
+    created.setId(id);
+    created.setName(newNode.get("name").asText());
+    created.setDepartment(newNode.get("Department").asText());
+    created.setAppCode(newNode.get("AppCode").asText());
+    created.setVersion(newNode.get("version").asText());
+    created.setCreatedAt(ZonedDateTime.parse(now).toLocalDateTime());
+    created.setUpdatedAt(ZonedDateTime.parse(now).toLocalDateTime());
+    created.setCreatedBy(username);
+    created.setUpdatedBy(username);
+    created.setContent(fileContent.get("Main Prompt Content").asText());
+    created.setInstructions(fileContent.get("Additional Instructions").asText());
+    created.setExamples(objectMapper.convertValue(fileContent.get("Examples"), new TypeReference<>() {
+    }));
+    return created;
+}
 
     // 4. Update template
     public Template updateTemplate(String id, Map<String, Object> payload) throws Exception {
@@ -232,6 +243,20 @@ public class BitbucketService {
         commitFiles("Delete template " + id + " - " + comment, files);
         return Map.of("success", true, "deletedId", id);
     }
+    // 6. Get AppCodes
+    public List<String> getAppCodesByDepartment(String department) throws Exception {
+    ArrayNode metadata = (ArrayNode) fetchMetadata();
+    Set<String> appCodes = new TreeSet<>();
+
+    for (JsonNode node : metadata) {
+        if (node.has("Department") && department.equals(node.get("Department").asText())) {
+            if (node.has("AppCode")) {
+                appCodes.add(node.get("AppCode").asText());
+            }
+        }
+    }
+    return new ArrayList<>(appCodes);
+}
 
     /** ------------- Ancillary (used by FE for dropdowns, etc) -------------- **/
 
