@@ -44,6 +44,7 @@ export interface UpdateTemplateData {
 }
 
 export interface Activity {
+  id: number;
   user: string;
   action: string;
   templateName: string;

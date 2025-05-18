@@ -36,7 +36,7 @@ public class BitbucketService {
     @Value("${bitbucket.appPassword}")
     private String appPassword;
 
-    @Value("${template.delete.requireApproval:true}")
+    @Value("${template.delete.requireApproval:false}")
     private boolean requireApproval;
 
     public BitbucketService(RestTemplate restTemplate, ObjectMapper objectMapper) {
@@ -334,22 +334,45 @@ public class BitbucketService {
         // --- Maker-checker logic: create a branch, commit, and open PR ---
         if (requireApproval) {
             String branchName = String.format("delete-template-%s-%d", id, System.currentTimeMillis());
-            // 1. Create branch (Bitbucket API: refs/branches)
-            createBranch(branchName);
-            // 2. Commit metadata.json (remove template)
-            Map<String, String> files = Map.of(
-                    "metadata.json", objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(updatedMetadata));
-            commitFilesToBranch("Delete template metadata: " + templateName + " (ID: " + id + ")", files, branchName);
-            // 3. Commit file deletion (empty file)
-            Map<String, String> deleteFile = Map.of(
-                    filePath, "");
-            commitFilesToBranch("Delete template file: " + templateName + " (ID: " + id + ")", deleteFile, branchName);
-            // 4. Create PR
-            String prTitle = "Delete Template: " + templateName;
-            String prDescription = String.format(
-                    "Deletion request for template ID %s.\n\nRequested by: %s\nComment: %s\n\nThis PR will:\n1. Remove the template entry from metadata.json\n2. Delete the template file at %s",
-                    id, username, (comment == null ? "No comment provided" : comment), filePath);
-            String prUrl = createPullRequest(branchName, prTitle, prDescription);
+            try {
+                // 1. Create branch (Bitbucket API: refs/branches)
+                createBranch(branchName);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create branch: " + e.getMessage(), e);
+            }
+            try {
+                // 2. Commit metadata.json (remove template)
+                Map<String, String> files = Map.of(
+                        "metadata.json",
+                        objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(updatedMetadata));
+                commitFilesToBranch("Delete template metadata: " + templateName + " (ID: " + id + ")", files,
+                        branchName);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to commit metadata.json to branch: " + e.getMessage(), e);
+            }
+            try {
+                // 3. Commit file deletion (empty file)
+                Map<String, String> deleteFile = Map.of(
+                        filePath, "");
+                commitFilesToBranch("Delete template file: " + templateName + " (ID: " + id + ")", deleteFile,
+                        branchName);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to commit file deletion to branch: " + e.getMessage(), e);
+            }
+            String prUrl = null;
+            try {
+                // 4. Create PR
+                String prTitle = "Delete Template: " + templateName;
+                String prDescription = String.format(
+                        "Deletion request for template ID %s.\n\nRequested by: %s\nComment: %s\n\nThis PR will:\n1. Remove the template entry from metadata.json\n2. Delete the template file at %s",
+                        id, username, (comment == null ? "No comment provided" : comment), filePath);
+                prUrl = createPullRequest(branchName, prTitle, prDescription);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create pull request: " + e.getMessage(), e);
+            }
+            if (prUrl == null || prUrl.isBlank()) {
+                throw new RuntimeException("Pull request URL is null or blank. PR creation may have failed.");
+            }
             return Map.of(
                     "success", true,
                     "status", "pending_approval",
