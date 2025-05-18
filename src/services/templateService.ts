@@ -8,92 +8,26 @@ import {
   VersionHistory,
 } from "../types";
 
-// Mock database (simple arrays)
-// Can not delete or update or create since hardcoded for now
-// let templates: Template[] = [
-//   {
-//     id: "1",
-//     departmentCodes: ["3DS"],
-//     name: "Risk Assessment",
-//     content: "Identify and evaluate risks...",
-//     version: "v1.2",
-//     lastUsed: "2 hours ago",
-//     collection: "Security",
-//     updatedBy: "J Chua",
-//     createdAt: new Date(2025, 1, 30, 14, 58),
-//     updatedAt: new Date(2025, 1, 31, 14, 58),
-//     createdBy: "J Chua",
-//   },
-//   {
-//     id: "2",
-//     departmentCodes: ["3DS"],
-//     name: "Customer Support Test",
-//     content: "Standard responses for inquiries...",
-//     version: "v1.0",
-//     lastUsed: "5 hours ago",
-//     collection: "Favorites",
-//     updatedBy: "J Chua",
-//     createdAt: new Date(2025, 1, 30, 14, 58),
-//     updatedAt: new Date(NaN),
-//     createdBy: "",
-//   },
-//   {
-//     id: "3",
-//     departmentCodes: ["DDP"],
-//     name: "Developer Portal",
-//     content: "Standard responses for inquiries...",
-//     version: "v1.0",
-//     lastUsed: "5 hours ago",
-//     collection: "Favorites",
-//     updatedBy: "J Chua",
-//     createdAt: new Date(2025, 2, 3, 14, 58),
-//     updatedAt: new Date(2025, 2, 4, 14, 58),
-//     createdBy: "J Chua",
-//   },
-//   {
-//     id: "4",
-//     departmentCodes: ["DVX"],
-//     name: "DevOps Services",
-//     content: "Standard responses for inquiries...",
-//     version: "v1.0",
-//     lastUsed: "5 hours ago",
-//     collection: "Favorites",
-//     updatedBy: "J Chua",
-//     createdAt: new Date(2025, 3, 30, 14, 58),
-//     updatedAt: new Date(2025, 3, 31, 14, 58),
-//     createdBy: "J Chua",
-//   },
-//   {
-//     id: "5",
-//     departmentCodes: ["HR"],
-//     name: "Human Resources",
-//     content: "Standard responses for inquiries...",
-//     version: "v1.0",
-//     lastUsed: "5 hours ago",
-//     collection: "HR",
-//     updatedBy: "J Chua",
-//     createdAt: new Date(2025, 2, 10, 14, 58),
-//     updatedAt: new Date(2025, 2, 12, 14, 58),
-//     createdBy: "J Chua",
-//   },
-//   {
-//     id: "6",
-//     departmentCodes: ["CCM"],
-//     name: "Control Management",
-//     content: "Standard responses for inquiries...",
-//     version: "v1.0",
-//     lastUsed: "5 hours ago",
-//     collection: "CCM",
-//     updatedBy: "J Chua",
-//     createdAt: new Date(2025, 3, 10, 14, 58),
-//     updatedAt: new Date(2025, 3, 11, 14, 58),
-//     createdBy: "J Chua",
-//   },
-// ];
+/** Backend API Base URL */
+const API_BASE_URL = "http://localhost:8080/api";
 
-const API_BASE_URL = 'http://localhost:8080/api';
+export function extractTemplate(obj: any): any | null {
+  if (!obj) return null;
+  if (obj.template) return obj.template;
+  if (obj.data) return extractTemplate(obj.data);
+  if (obj.success && typeof obj.success === "boolean") {
+    const keys = Object.keys(obj).filter((k) => k !== "success");
+    for (const key of keys) {
+      const value = extractTemplate(obj[key]);
+      if (value) return value;
+    }
+  }
+  // If it looks like a template itself
+  if (obj.id && obj.name) return obj;
+  return null;
+}
 
-// Export logToBackend so it can be used elsewhere
+/** Logs API interactions (non-blocking, fire-and-forget) */
 export const logToBackend = async (log: ApiLog): Promise<void> => {
   try {
     await fetch(`${API_BASE_URL}/logs`, {
@@ -105,10 +39,15 @@ export const logToBackend = async (log: ApiLog): Promise<void> => {
       }),
     });
   } catch (error) {
+    // Silently ignore errors for logging
     console.error("Failed to log to backend:", error);
   }
 };
 
+/**
+ * Fetches templates from backend, handling the deeply nested structure from Spring Boot.
+ * @returns Array of Template objects.
+ */
 export async function getTemplates(): Promise<Template[]> {
   const response = await fetch(`${API_BASE_URL}/templates`);
   if (!response.ok) {
@@ -117,19 +56,40 @@ export async function getTemplates(): Promise<Template[]> {
     throw new Error("Failed to fetch templates");
   }
   const data = await response.json();
-  return Array.isArray(data) ? data : data.values || [];
+
+  // Robustly handle different possible backend response shapes
+  if (
+    data &&
+    data.templates &&
+    data.templates.body &&
+    Array.isArray(data.templates.body.templates)
+  ) {
+    return data.templates.body.templates;
+  }
+  // Fallback for other possible response shapes
+  if (data && Array.isArray(data.templates)) {
+    return data.templates;
+  }
+  if (Array.isArray(data)) {
+    return data;
+  }
+  return [];
 }
 
-export async function getTemplate(id: string): Promise<Template> {
+export async function getTemplate(id: string): Promise<Template | null> {
   const response = await fetch(`${API_BASE_URL}/templates/${id}`);
   if (!response.ok) {
     const errorText = await response.text();
     console.error("Error fetching template:", response.status, errorText);
     throw new Error("Failed to fetch template");
   }
-  return await response.json();
+  const data = await response.json();
+  return extractTemplate(data);
 }
 
+/**
+ * Creates a new template.
+ */
 export async function createTemplate(
   data: CreateTemplateData
 ): Promise<Template> {
@@ -149,50 +109,48 @@ export async function createTemplate(
     throw new Error("Failed to create template");
   }
 
-  return await response.json();
+  const result = await response.json();
+  if (result && result.template) {
+    return result.template;
+  }
+  throw new Error("Template creation: Invalid response from server");
 }
 
+/**
+ * Updates a template.
+ */
 export async function updateTemplate(
   data: UpdateTemplateData
 ): Promise<Template> {
-  // Make sure we have an ID
-  if (!data.id) {
-    throw new Error("Template ID is required for updates");
-  }
-
-  console.log("Updating template with data:", data);
-
-  const response = await fetch(
-    `${API_BASE_URL}/templates/${data.id}`,
-    {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: data.name,
-        content: data.content,
-        department: data.department,
-        appCode: data.appCode,
-        instructions: data.instructions || "",
-        examples: data.examples || [],
-      }),
-    }
-  );
+  if (!data.id) throw new Error("Template ID is required for updates");
+  const response = await fetch(`${API_BASE_URL}/templates/${data.id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: data.name,
+      content: data.content,
+      department: data.department,
+      appCode: data.appCode,
+      instructions: data.instructions || "",
+      examples: data.examples || [],
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
     console.error("Error updating template:", response.status, errorText);
     throw new Error(`Failed to update template: ${errorText}`);
   }
-
   const result = await response.json();
-
-  if (!result.success || !result.template) {
-    throw new Error("Invalid response format from server");
+  if (result && result.success && result.template) {
+    return result.template;
   }
-
-  return result.template;
+  throw new Error("Template update: Invalid response from server");
 }
 
+/**
+ * Deletes a template by ID.
+ */
 export async function deleteTemplate(
   id: string,
   comment?: string
@@ -204,12 +162,8 @@ export async function deleteTemplate(
 }> {
   const response = await fetch(`${API_BASE_URL}/templates/${id}`, {
     method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      requestComment: comment || "",
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ requestComment: comment || "" }),
   });
 
   if (!response.ok) {
@@ -219,15 +173,17 @@ export async function deleteTemplate(
   }
 
   const result = await response.json();
-
   return {
-    success: result.success,
+    success: !!result.success,
     status: result.status || "deleted",
     pullRequestUrl: result.pullRequestUrl,
     message: result.message,
   };
 }
 
+/**
+ * Fetches recent activities.
+ */
 export async function getRecentActivities(): Promise<Activity[]> {
   const response = await fetch(`${API_BASE_URL}/activities`);
   if (!response.ok) {
@@ -237,6 +193,9 @@ export async function getRecentActivities(): Promise<Activity[]> {
   return await response.json();
 }
 
+/**
+ * Fetches user information.
+ */
 export const getUsers = async (): Promise<User[]> => {
   const response = await fetch(`${API_BASE_URL}/users`);
   if (!response.ok) {
@@ -254,6 +213,9 @@ export const getUsers = async (): Promise<User[]> => {
   return await response.json();
 };
 
+/**
+ * Fetches the version history for a template.
+ */
 export async function getVersionHistory(
   templateId: string
 ): Promise<VersionHistory[]> {
@@ -261,50 +223,32 @@ export async function getVersionHistory(
     const response = await fetch(
       `${API_BASE_URL}/templates/${templateId}/history`
     );
-
     if (!response.ok) {
       console.error("Error fetching version history:", response.status);
       return [];
     }
-
     const data = await response.json();
-
-    // Check if the response has the expected structure
     if (data.success === false) {
       console.error("Error in version history response:", data.error);
       return [];
     }
-
-    // Handle both the new response format and the legacy format
     const history = data.history || data;
-    
-    // Ensure we return an array
-    if (Array.isArray(history)) {
-      return history;
-    } else {
-      console.warn(
-        "Version history is not an array, returning empty array instead"
-      );
-      return [];
-    }
+    return Array.isArray(history) ? history : [];
   } catch (error) {
     console.error("Error fetching version history:", error);
     return [];
   }
 }
 
+/**
+ * Fetches the Bitbucket structure (departments/appCodes).
+ */
 export async function getBitbucketStructure(): Promise<{
   departments: string[];
   appCodes: Array<{ department: string; appCode: string }>;
 }> {
   try {
-    console.log("Fetching Bitbucket structure...");
-    const response = await fetch(
-      `${API_BASE_URL}/bitbucket/structure`
-    );
-
-    console.log("Response status:", response.status);
-
+    const response = await fetch(`${API_BASE_URL}/bitbucket/structure`);
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Error response:", errorText);
@@ -312,14 +256,10 @@ export async function getBitbucketStructure(): Promise<{
         `Failed to fetch structure: ${response.status} - ${errorText}`
       );
     }
-
     const data = await response.json();
-    console.log("Received structure data:", data);
-
     if (!data.success) {
       throw new Error(data.error || "Failed to fetch structure");
     }
-
     return {
       departments: data.departments || [],
       appCodes: data.appCodes || [],

@@ -72,7 +72,7 @@ const ViewTemplate: React.FC = () => {
     );
   }
 
-  // Function to generate a color based on the user's name (for avatars)
+  // Utility: generate a color based on a string (for user avatars)
   const getUserColor = (name: string) => {
     const colors = [
       "#1976d2", // blue
@@ -84,16 +84,18 @@ const ViewTemplate: React.FC = () => {
       "#c2185b", // pink
     ];
     // Simple hash function to generate a consistent color for each name
-    const hash = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const hash = name
+      ? name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
+      : 0;
     return colors[hash % colors.length];
   };
 
-  // Function to get initials from name
+  // Utility: get initials from name
   const getInitials = (name: string) => {
     if (!name || name === "Unknown") return "?";
     return name
       .split(/\s+/)
-      .map(word => word[0])
+      .map((word) => word[0])
       .join("")
       .toUpperCase()
       .substring(0, 2);
@@ -155,7 +157,7 @@ const ViewTemplate: React.FC = () => {
                 <Typography>{template.instructions}</Typography>
               </Paper>
 
-              {template.examples.length > 0 && (
+              {template.examples && template.examples.length > 0 && (
                 <Box sx={{ mb: 3 }}>
                   <Typography variant="h6" gutterBottom>
                     Examples
@@ -169,80 +171,123 @@ const ViewTemplate: React.FC = () => {
                         <Typography variant="subtitle2" color="primary">
                           User Input:
                         </Typography>
-                        <Typography>{example["User Input"]}</Typography>
+                        <Typography>{example["User Input"] || "-"}</Typography>
                       </Box>
                       <Box>
                         <Typography variant="subtitle2" color="primary">
                           Expected Output:
                         </Typography>
-                        <Typography>{example["Expected Output"]}</Typography>
+                        <Typography>
+                          {example["Expected Output"] || "-"}
+                        </Typography>
                       </Box>
                     </Paper>
                   ))}
                 </Box>
               )}
 
-              <Box sx={{ mt: 3, p: 2, bgcolor: "background.paper", borderRadius: 1, border: '1px solid rgba(0,0,0,0.08)' }}>
-                <Typography variant="body2" color="text.secondary" sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+              <Box
+                sx={{
+                  mt: 3,
+                  p: 2,
+                  bgcolor: "background.paper",
+                  borderRadius: 1,
+                  border: "1px solid rgba(0,0,0,0.08)",
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ display: "flex", alignItems: "center", mb: 1 }}
+                >
                   <PersonIcon sx={{ mr: 1, fontSize: "small" }} />
-                  Created by <Box component="span" sx={{ fontWeight: "bold", mx: 0.5 }}>{template.createdBy}</Box> on{" "}
-                  {new Date(template.createdAt).toLocaleString()}
+                  Created by{" "}
+                  <Box component="span" sx={{ fontWeight: "bold", mx: 0.5 }}>
+                    {template.createdBy}
+                  </Box>{" "}
+                  on{" "}
+                  {template.createdAt
+                    ? new Date(template.createdAt).toLocaleString()
+                    : "-"}
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ display: "flex", alignItems: "center" }}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ display: "flex", alignItems: "center" }}
+                >
                   <PersonIcon sx={{ mr: 1, fontSize: "small" }} />
-                  Last updated by <Box component="span" sx={{ fontWeight: "bold", mx: 0.5 }}>{template.updatedBy}</Box> on{" "}
-                  {new Date(template.updatedAt).toLocaleString()}
+                  Last updated by{" "}
+                  <Box component="span" sx={{ fontWeight: "bold", mx: 0.5 }}>
+                    {template.updatedBy}
+                  </Box>{" "}
+                  on{" "}
+                  {template.updatedAt
+                    ? new Date(template.updatedAt).toLocaleString()
+                    : "-"}
                 </Typography>
               </Box>
             </Grid>
 
             {/* Right Column - Version History */}
             <Grid item xs={12} md={5}>
-              <Paper 
-                variant="outlined" 
-                sx={{ 
-                  p: 2, 
-                  height: "100%", 
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  height: "100%",
                   bgcolor: "background.paper",
                   position: "sticky",
-                  top: 16
+                  top: 16,
                 }}
               >
                 <Typography
                   variant="h6"
-                  sx={{ 
-                    display: "flex", 
+                  sx={{
+                    display: "flex",
                     alignItems: "center",
-                    mb: 2 
+                    mb: 2,
                   }}
                 >
                   <HistoryIcon sx={{ mr: 1 }} />
                   Version History
                 </Typography>
-                
+
                 <Divider sx={{ mb: 2 }} />
-                
+
                 {Array.isArray(versionHistory) && versionHistory.length > 0 ? (
-                  <Stack spacing={1.5} sx={{ maxHeight: "70vh", overflow: "auto", pr: 1 }}>
+                  <Stack
+                    spacing={1.5}
+                    sx={{ maxHeight: "70vh", overflow: "auto", pr: 1 }}
+                  >
                     {versionHistory.map((version, index) => (
-                      <Card 
+                      <Card
                         key={version.commitId || `version-${index}`}
-                        variant="outlined" 
-                        sx={{ 
+                        variant="outlined"
+                        sx={{
                           boxShadow: "none",
                           borderRadius: 1,
-                          borderLeft: `3px solid ${getUserColor(version.userDisplayName)}`,
+                          borderLeft: `3px solid ${getUserColor(
+                            version.userDisplayName
+                          )}`,
                         }}
                       >
-                        <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-                          <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                            <Avatar 
-                              sx={{ 
+                        <CardContent
+                          sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              mb: 1,
+                            }}
+                          >
+                            <Avatar
+                              sx={{
                                 bgcolor: getUserColor(version.userDisplayName),
                                 width: 24,
                                 height: 24,
                                 fontSize: "0.8rem",
-                                mr: 1
+                                mr: 1,
                               }}
                             >
                               {getInitials(version.userDisplayName)}
@@ -251,34 +296,38 @@ const ViewTemplate: React.FC = () => {
                               {version.userDisplayName}
                             </Typography>
                             <Box sx={{ flexGrow: 1 }} />
-                            <Chip 
-                              label={version.version} 
-                              color="primary" 
+                            <Chip
+                              label={version.version}
+                              color="primary"
                               size="small"
                               sx={{ height: 20, fontSize: "0.7rem" }}
                             />
                           </Box>
-                          
-                          <Typography 
-                            variant="caption" 
-                            sx={{ 
-                              display: "block", 
+
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              display: "block",
                               color: "text.secondary",
-                              mb: 1
+                              mb: 1,
                             }}
                           >
-                            {new Date(version.timestamp).toLocaleString()}
+                            {version.timestamp
+                              ? new Date(version.timestamp).toLocaleString()
+                              : "-"}
                           </Typography>
-                          
-                          <Box sx={{ 
-                            p: 1, 
-                            bgcolor: "rgba(0,0,0,0.02)", 
-                            borderRadius: 1,
-                            fontSize: "0.75rem",
-                            fontFamily: "monospace",
-                            wordBreak: "break-word",
-                            border: '1px solid rgba(0,0,0,0.05)'
-                          }}>
+
+                          <Box
+                            sx={{
+                              p: 1,
+                              bgcolor: "rgba(0,0,0,0.02)",
+                              borderRadius: 1,
+                              fontSize: "0.75rem",
+                              fontFamily: "monospace",
+                              wordBreak: "break-word",
+                              border: "1px solid rgba(0,0,0,0.05)",
+                            }}
+                          >
                             {version.message}
                           </Box>
                         </CardContent>
@@ -286,15 +335,19 @@ const ViewTemplate: React.FC = () => {
                     ))}
                   </Stack>
                 ) : (
-                  <Box sx={{ 
-                    p: 3, 
-                    textAlign: "center", 
-                    bgcolor: "background.paper",
-                    borderRadius: 1,
-                    border: "1px dashed",
-                    borderColor: "divider"
-                  }}>
-                    <HistoryIcon sx={{ fontSize: 32, color: "text.disabled", mb: 1 }} />
+                  <Box
+                    sx={{
+                      p: 3,
+                      textAlign: "center",
+                      bgcolor: "background.paper",
+                      borderRadius: 1,
+                      border: "1px dashed",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <HistoryIcon
+                      sx={{ fontSize: 32, color: "text.disabled", mb: 1 }}
+                    />
                     <Typography variant="body2" color="text.secondary">
                       No version history available
                     </Typography>

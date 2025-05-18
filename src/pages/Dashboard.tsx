@@ -10,14 +10,11 @@ import {
   Breadcrumbs,
   Card,
   CardContent,
-  CardActionArea,
   Divider,
   Chip,
   List,
   Tooltip,
   Skeleton,
-  useTheme,
-  useMediaQuery,
   Alert,
   Fade,
   Dialog,
@@ -36,24 +33,19 @@ import FolderIcon from "@mui/icons-material/Folder";
 import DescriptionIcon from "@mui/icons-material/Description";
 import HomeIcon from "@mui/icons-material/Home";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
-import InfoIcon from "@mui/icons-material/Info";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import SearchIcon from "@mui/icons-material/Search";
 
-// Lazy load components for better performance
 const LazyTemplateCard = React.lazy(() => import("../components/TemplateCard"));
 
-// Department descriptions
 const departmentDescriptions: Record<string, string> = {
   "Architecture & Engineering":
     "Templates for architecture and engineering processes and documentation.",
   CardsTechnology:
     "Card technology templates for payment processing and related systems.",
-  // Add descriptions for other departments as they're created
 };
 
-// Loading skeleton for template cards
 const TemplateCardSkeleton = () => (
   <Card variant="outlined" sx={{ height: "100%" }}>
     <CardContent>
@@ -73,8 +65,6 @@ const TemplateCardSkeleton = () => (
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const [activities, setActivities] = useState<Activity[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -87,13 +77,11 @@ const Dashboard: React.FC = () => {
   const [showFilterOptions, setShowFilterOptions] = useState<boolean>(false);
   const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
 
-  // Handle browser back/forward buttons with location state
   useEffect(() => {
     const state = location.state as {
       department?: string;
       appCode?: string;
     } | null;
-
     if (state) {
       if (state.department) setSelectedDepartment(state.department);
       if (state.appCode) setSelectedAppCode(state.appCode);
@@ -108,15 +96,9 @@ const Dashboard: React.FC = () => {
           getTemplates(),
           getRecentActivities(),
         ]);
-
-        const activitiesArray = Array.isArray(activitiesRes)
-          ? activitiesRes
-          : [];
-
-        setTemplates(templatesRes);
-        setActivities(activitiesArray);
+        setTemplates(templatesRes || []);
+        setActivities(Array.isArray(activitiesRes) ? activitiesRes : []);
       } catch (err) {
-        console.error("Failed to load dashboard data:", err);
         setError("Failed to load dashboard data. Please try again later.");
         setActivities([]);
       } finally {
@@ -126,49 +108,37 @@ const Dashboard: React.FC = () => {
     loadData();
   }, []);
 
-  // Get unique departments for filtering
   const getUniqueDepartments = () => {
     const departments = new Set<string>();
     templates.forEach((template) => {
-      if (template.department) {
-        departments.add(template.department);
-      }
+      if (template.department) departments.add(template.department);
     });
     return Array.from(departments);
   };
 
-  // Get unique app codes for the selected department
   const getAppCodesForDepartment = (department: string) => {
     const appCodes = new Set<string>();
     templates.forEach((template) => {
-      if (template.department === department && template.appCode) {
+      if (template.department === department && template.appCode)
         appCodes.add(template.appCode);
-      }
     });
     return Array.from(appCodes);
   };
 
-  // Get recent templates (most recently updated)
-  const getRecentTemplates = () => {
-    return [...templates]
+  const getRecentTemplates = () =>
+    [...templates]
       .sort(
         (a, b) =>
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       )
       .slice(0, 4);
-  };
 
-  // Handle department selection
   const handleDepartmentClick = (dept: string) => {
     setSelectedDepartment(dept);
     setSelectedAppCode("");
-    navigate("", {
-      state: { department: dept, appCode: "" },
-      replace: false,
-    });
+    navigate("", { state: { department: dept, appCode: "" }, replace: false });
   };
 
-  // Handle app code selection
   const handleAppCodeClick = (appCode: string) => {
     setSelectedAppCode(appCode);
     navigate("", {
@@ -177,7 +147,6 @@ const Dashboard: React.FC = () => {
     });
   };
 
-  // Handle reset navigation (back to departments view)
   const handleReset = () => {
     setSelectedDepartment("");
     setSelectedAppCode("");
@@ -187,14 +156,10 @@ const Dashboard: React.FC = () => {
     });
   };
 
-  // Filter templates based on selection and search
   const filteredTemplates = templates.filter((template) => {
-    if (selectedDepartment && template.department !== selectedDepartment) {
+    if (selectedDepartment && template.department !== selectedDepartment)
       return false;
-    }
-    if (selectedAppCode && template.appCode !== selectedAppCode) {
-      return false;
-    }
+    if (selectedAppCode && template.appCode !== selectedAppCode) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -213,6 +178,7 @@ const Dashboard: React.FC = () => {
     ? filteredTemplates
     : filteredTemplates.slice(0, 6);
 
+  // --- Loading state skeleton ---
   if (isLoading) {
     return (
       <Box sx={{ minHeight: "100vh", backgroundColor: "background.default" }}>
@@ -248,12 +214,7 @@ const Dashboard: React.FC = () => {
                   {[1, 2, 3, 4, 5, 6].map((item) => (
                     <Grid item xs={12} sm={6} md={4} key={item}>
                       <Card variant="outlined" sx={{ height: "100%" }}>
-                        <CardContent
-                          sx={{
-                            textAlign: "center",
-                            py: 3,
-                          }}
-                        >
+                        <CardContent sx={{ textAlign: "center", py: 3 }}>
                           <Skeleton
                             variant="circular"
                             width={60}
@@ -326,24 +287,12 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Render breadcrumb navigation with enhanced styling
+  // --- Render breadcrumb navigation ---
   const renderBreadcrumbs = () => {
     if (!selectedDepartment) return null;
-
     return (
       <Box sx={{ mb: 3 }}>
-        <Breadcrumbs
-          separator={<NavigateNextIcon fontSize="small" />}
-          sx={{
-            p: 1.5,
-            backgroundColor: "background.paper",
-            borderRadius: 1,
-            boxShadow: 1,
-            "& .MuiBreadcrumbs-ol": {
-              flexWrap: isMobile ? "wrap" : "nowrap",
-            },
-          }}
-        >
+        <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />}>
           <Button
             startIcon={<HomeIcon />}
             onClick={handleReset}
@@ -354,60 +303,31 @@ const Dashboard: React.FC = () => {
             Home
           </Button>
           {selectedDepartment && !selectedAppCode ? (
-            <Typography
-              color="text.primary"
-              noWrap
-              sx={{
-                maxWidth: isMobile ? 150 : 200,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                display: "block",
-              }}
-            >
-              {selectedDepartment}
-            </Typography>
+            <Typography color="text.primary">{selectedDepartment}</Typography>
           ) : (
             <Button
               onClick={() => setSelectedAppCode("")}
               color="primary"
               size="small"
-              sx={{
-                textTransform: "none",
-                maxWidth: isMobile ? 150 : 200,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
+              sx={{ textTransform: "none" }}
             >
               {selectedDepartment}
             </Button>
           )}
           {selectedAppCode && (
-            <Typography
-              color="text.primary"
-              noWrap
-              sx={{
-                maxWidth: isMobile ? 150 : 200,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                display: "block",
-              }}
-            >
-              {selectedAppCode}
-            </Typography>
+            <Typography color="text.primary">{selectedAppCode}</Typography>
           )}
         </Breadcrumbs>
       </Box>
     );
   };
 
-  // Render content based on navigation state
+  // --- Content logic ---
   const renderContent = () => {
-    // No department selected: show departments list
+    // Departments List
     if (!selectedDepartment) {
       return (
         <>
-          {/* Search bar for departments */}
           <Box sx={{ mb: 3, display: "flex" }}>
             <Paper
               component="form"
@@ -438,7 +358,6 @@ const Dashboard: React.FC = () => {
             </Paper>
           </Box>
 
-          {/* Departments Section */}
           <Box>
             <Typography
               variant="h6"
@@ -448,7 +367,7 @@ const Dashboard: React.FC = () => {
                 alignItems: "center",
                 mb: 2,
                 pl: 1,
-                borderLeft: `4px solid ${theme.palette.primary.main}`,
+                borderLeft: `4px solid #1976d2`,
               }}
             >
               <FolderIcon sx={{ mr: 1 }} /> Browse by Department
@@ -475,78 +394,56 @@ const Dashboard: React.FC = () => {
                           },
                         }}
                       >
-                        <CardActionArea
-                          onClick={() => handleDepartmentClick(dept)}
+                        <CardContent
                           sx={{
-                            height: "100%",
+                            textAlign: "center",
+                            py: 3,
+                            flex: 1,
                             display: "flex",
                             flexDirection: "column",
-                            alignItems: "stretch",
                           }}
+                          onClick={() => handleDepartmentClick(dept)}
                         >
-                          <CardContent
+                          <FolderIcon
                             sx={{
-                              textAlign: "center",
-                              py: 3,
-                              flex: 1,
-                              display: "flex",
-                              flexDirection: "column",
+                              fontSize: 60,
+                              color: "primary.main",
+                              mb: 1,
                             }}
-                          >
-                            <FolderIcon
-                              sx={{
-                                fontSize: 60,
-                                color: "primary.main",
-                                mb: 1,
-                                filter:
-                                  "drop-shadow(0px 2px 3px rgba(0,0,0,0.1))",
-                              }}
-                            />
-                            <Box sx={{ mb: 1, flex: 1 }}>
-                              <Tooltip title={dept} arrow placement="top">
-                                <Typography
-                                  variant="h6"
-                                  component="div"
-                                  sx={{
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    display: "-webkit-box",
-                                    WebkitLineClamp: 1,
-                                    WebkitBoxOrient: "vertical",
-                                    wordBreak: "break-word",
-                                    mb: 1,
-                                  }}
-                                >
-                                  {dept}
-                                </Typography>
-                              </Tooltip>
+                          />
+                          <Box sx={{ mb: 1, flex: 1 }}>
+                            <Tooltip title={dept} arrow placement="top">
                               <Typography
-                                variant="body2"
-                                color="text.secondary"
+                                variant="h6"
+                                component="div"
                                 sx={{
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
-                                  display: "-webkit-box",
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: "vertical",
-                                  height: "2.4em",
+                                  mb: 1,
                                 }}
                               >
-                                {departmentDescriptions[dept] ||
-                                  "Templates for this department."}
+                                {dept}
                               </Typography>
-                            </Box>
-                            <Chip
-                              label={`${
-                                templates.filter((t) => t.department === dept)
-                                  .length
-                              } Templates`}
-                              size="small"
-                              color="primary"
-                              sx={{ alignSelf: "center" }}
-                            />
-                          </CardContent>
-                        </CardActionArea>
+                            </Tooltip>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{ overflow: "hidden" }}
+                            >
+                              {departmentDescriptions[dept] ||
+                                "Templates for this department."}
+                            </Typography>
+                          </Box>
+                          <Chip
+                            label={`${
+                              templates.filter((t) => t.department === dept)
+                                .length
+                            } Templates`}
+                            size="small"
+                            color="primary"
+                            sx={{ alignSelf: "center" }}
+                          />
+                        </CardContent>
                       </Card>
                     </Grid>
                   ))
@@ -594,7 +491,7 @@ const Dashboard: React.FC = () => {
       );
     }
 
-    // Department selected but no app code: show app codes
+    // App Codes List
     if (selectedDepartment && !selectedAppCode) {
       return (
         <>
@@ -608,30 +505,13 @@ const Dashboard: React.FC = () => {
                 alignItems: "center",
                 mb: 2,
                 pl: 1,
-                borderLeft: `4px solid ${theme.palette.primary.main}`,
+                borderLeft: `4px solid #1976d2`,
               }}
             >
               <FolderIcon sx={{ mr: 1, color: "primary.main" }} />
               App Codes in {selectedDepartment}
             </Typography>
-            <Paper
-              sx={{
-                p: 2,
-                backgroundColor: theme.palette.background.paper,
-                mb: 3,
-                borderLeft: `4px solid ${theme.palette.info.light}`,
-              }}
-            >
-              <Box sx={{ display: "flex" }}>
-                <InfoIcon sx={{ color: "info.main", mr: 1, fontSize: 20 }} />
-                <Typography variant="body2" color="text.secondary">
-                  {departmentDescriptions[selectedDepartment] ||
-                    "Browse available application codes in this department."}
-                </Typography>
-              </Box>
-            </Paper>
-
-            {/* Search bar for app codes */}
+            {/* App code search */}
             <Box sx={{ mb: 3, display: "flex" }}>
               <Paper
                 component="form"
@@ -662,7 +542,6 @@ const Dashboard: React.FC = () => {
               </Paper>
             </Box>
           </Box>
-
           <Grid container spacing={3}>
             {getAppCodesForDepartment(selectedDepartment).length > 0 ? (
               getAppCodesForDepartment(selectedDepartment)
@@ -685,68 +564,49 @@ const Dashboard: React.FC = () => {
                         },
                       }}
                     >
-                      <CardActionArea
+                      <CardContent
+                        sx={{ textAlign: "center", py: 3, height: "100%" }}
                         onClick={() => handleAppCodeClick(appCode)}
-                        sx={{
-                          height: "100%",
-                          display: "flex",
-                          flexDirection: "column",
-                        }}
                       >
-                        <CardContent
-                          sx={{ textAlign: "center", py: 3, height: "100%" }}
-                        >
-                          <FolderIcon
+                        <FolderIcon
+                          sx={{
+                            fontSize: 60,
+                            color: "secondary.main",
+                            mb: 1,
+                          }}
+                        />
+                        <Tooltip title={appCode} arrow placement="top">
+                          <Typography
+                            variant="h6"
+                            component="div"
                             sx={{
-                              fontSize: 60,
-                              color: "secondary.main",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
                               mb: 1,
-                              filter:
-                                "drop-shadow(0px 2px 3px rgba(0,0,0,0.1))",
                             }}
-                          />
-                          <Tooltip title={appCode} arrow placement="top">
-                            <Typography
-                              variant="h6"
-                              component="div"
-                              sx={{
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                display: "-webkit-box",
-                                WebkitLineClamp: 1,
-                                WebkitBoxOrient: "vertical",
-                                mb: 1,
-                              }}
-                            >
-                              {appCode}
-                            </Typography>
-                          </Tooltip>
-                          <Chip
-                            label={`${
-                              templates.filter(
-                                (t) =>
-                                  t.department === selectedDepartment &&
-                                  t.appCode === appCode
-                              ).length
-                            } Templates`}
-                            size="small"
-                            color="secondary"
-                            sx={{ mt: 1 }}
-                          />
-                        </CardContent>
-                      </CardActionArea>
+                          >
+                            {appCode}
+                          </Typography>
+                        </Tooltip>
+                        <Chip
+                          label={`${
+                            templates.filter(
+                              (t) =>
+                                t.department === selectedDepartment &&
+                                t.appCode === appCode
+                            ).length
+                          } Templates`}
+                          size="small"
+                          color="secondary"
+                          sx={{ mt: 1 }}
+                        />
+                      </CardContent>
                     </Card>
                   </Grid>
                 ))
             ) : (
               <Grid item xs={12}>
-                <Paper
-                  sx={{
-                    p: 4,
-                    textAlign: "center",
-                    borderRadius: 2,
-                  }}
-                >
+                <Paper sx={{ p: 4, textAlign: "center", borderRadius: 2 }}>
                   <HourglassEmptyIcon
                     sx={{
                       fontSize: 40,
@@ -781,7 +641,7 @@ const Dashboard: React.FC = () => {
       );
     }
 
-    // Both department and app code selected: show templates with filter & preview functionality
+    // Templates List (by department & app code)
     return (
       <>
         {renderBreadcrumbs()}
@@ -791,47 +651,25 @@ const Dashboard: React.FC = () => {
             justifyContent: "space-between",
             alignItems: "center",
             mb: 3,
-            flexWrap: isMobile ? "wrap" : "nowrap",
           }}
         >
-          <Tooltip
-            title={`${selectedDepartment}/${selectedAppCode}`}
-            arrow
-            placement="top-start"
+          <Typography
+            variant="h6"
+            sx={{ display: "flex", alignItems: "center" }}
           >
-            <Typography
-              variant="h6"
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                maxWidth: "70%",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                mb: isMobile ? 2 : 0,
-              }}
-            >
-              <DescriptionIcon
-                sx={{ mr: 1, color: "primary.main", flexShrink: 0 }}
-              />
-              <span>
-                Templates in {selectedDepartment}/{selectedAppCode}
-              </span>
-            </Typography>
-          </Tooltip>
+            <DescriptionIcon sx={{ mr: 1, color: "primary.main" }} />
+            Templates in {selectedDepartment}/{selectedAppCode}
+          </Typography>
           <Button
             component={Link}
             to={`/create-template?department=${selectedDepartment}&appCode=${selectedAppCode}`}
             startIcon={<AddIcon />}
             variant="contained"
             size="small"
-            sx={{ width: isMobile ? "100%" : "auto" }}
           >
             Add Template
           </Button>
         </Box>
-
-        {/* Search bar for templates with filter toggle */}
         <Box sx={{ mb: 2, display: "flex", alignItems: "center" }}>
           <Paper
             component="form"
@@ -868,24 +706,6 @@ const Dashboard: React.FC = () => {
             </IconButton>
           </Paper>
         </Box>
-
-        {/* Optional additional filter options */}
-        {showFilterOptions && (
-          <Box
-            sx={{
-              mb: 3,
-              p: 2,
-              backgroundColor: theme.palette.background.paper,
-              borderRadius: 1,
-              boxShadow: 1,
-            }}
-          >
-            <Typography variant="body2" color="text.secondary">
-              Additional filter options coming soon...
-            </Typography>
-          </Box>
-        )}
-
         <Grid container spacing={2}>
           {displayTemplates.length > 0 ? (
             displayTemplates.map((template) => (
@@ -916,13 +736,7 @@ const Dashboard: React.FC = () => {
             ))
           ) : (
             <Grid item xs={12}>
-              <Paper
-                sx={{
-                  p: 4,
-                  textAlign: "center",
-                  borderRadius: 2,
-                }}
-              >
+              <Paper sx={{ p: 4, textAlign: "center", borderRadius: 2 }}>
                 <HourglassEmptyIcon
                   sx={{
                     fontSize: 40,
@@ -973,86 +787,70 @@ const Dashboard: React.FC = () => {
     );
   };
 
-  // Render recent templates column
-  const renderRecentTemplatesColumn = () => {
-    return (
-      <Box>
-        <Typography
-          variant="h6"
-          sx={{
-            mb: 3,
-            display: "flex",
-            alignItems: "center",
-            pl: 1,
-            borderLeft: `4px solid ${theme.palette.secondary.main}`,
-          }}
-        >
-          <VisibilityIcon sx={{ mr: 1, fontSize: 20 }} /> Recent Templates
-        </Typography>
-        {getRecentTemplates().length > 0 ? (
-          <List sx={{ px: 0 }}>
-            {getRecentTemplates().map((template) => (
-              <Box key={template.id} sx={{ mb: 2 }}>
-                <Suspense fallback={<TemplateCardSkeleton />}>
-                  <LazyTemplateCard template={template} />
-                </Suspense>
-              </Box>
-            ))}
-          </List>
-        ) : (
-          <Box
-            sx={{
-              p: 3,
-              textAlign: "center",
-              backgroundColor: theme.palette.background.paper,
-            }}
-          >
-            <Typography color="text.secondary">No recent templates</Typography>
-          </Box>
-        )}
-      </Box>
-    );
-  };
+  // --- Recent Templates ---
+  const renderRecentTemplatesColumn = () => (
+    <Box>
+      <Typography
+        variant="h6"
+        sx={{
+          mb: 3,
+          display: "flex",
+          alignItems: "center",
+          pl: 1,
+          borderLeft: `4px solid #9c27b0`,
+        }}
+      >
+        <VisibilityIcon sx={{ mr: 1, fontSize: 20 }} /> Recent Templates
+      </Typography>
+      {getRecentTemplates().length > 0 ? (
+        <List sx={{ px: 0 }}>
+          {getRecentTemplates().map((template) => (
+            <Box key={template.id} sx={{ mb: 2 }}>
+              <Suspense fallback={<TemplateCardSkeleton />}>
+                <LazyTemplateCard template={template} />
+              </Suspense>
+            </Box>
+          ))}
+        </List>
+      ) : (
+        <Box sx={{ p: 3, textAlign: "center" }}>
+          <Typography color="text.secondary">No recent templates</Typography>
+        </Box>
+      )}
+    </Box>
+  );
 
-  // Render recent activity with improved timeline formatting
-  const renderActivityColumn = () => {
-    return (
-      <Box>
-        <Typography
-          variant="h6"
-          sx={{
-            mb: 3,
-            display: "flex",
-            alignItems: "center",
-            pl: 1,
-            borderLeft: `4px solid ${theme.palette.secondary.main}`,
-          }}
-        >
-          Recent Activity
-        </Typography>
-        {activities.length > 0 ? (
-          activities.map((activity, index) => (
-            <Fade in={true} timeout={300 + index * 100} key={index}>
-              <Box>
-                <ActivityItem activity={activity} />
-                {index < activities.length - 1 && <Divider sx={{ my: 2 }} />}
-              </Box>
-            </Fade>
-          ))
-        ) : (
-          <Box
-            sx={{
-              p: 3,
-              textAlign: "center",
-              backgroundColor: theme.palette.background.paper,
-            }}
-          >
-            <Typography color="text.secondary">No recent activity</Typography>
-          </Box>
-        )}
-      </Box>
-    );
-  };
+  // --- Recent Activity ---
+  const renderActivityColumn = () => (
+    <Box>
+      <Typography
+        variant="h6"
+        sx={{
+          mb: 3,
+          display: "flex",
+          alignItems: "center",
+          pl: 1,
+          borderLeft: `4px solid #9c27b0`,
+        }}
+      >
+        Recent Activity
+      </Typography>
+      {activities.length > 0 ? (
+        activities.map((activity, index) => (
+          <Fade in={true} timeout={300 + index * 100} key={index}>
+            <Box sx={{ mb: 2 }}>
+              <ActivityItem activity={activity} />
+              {index < activities.length - 1 && <Divider sx={{ my: 2 }} />}
+            </Box>
+          </Fade>
+        ))
+      ) : (
+        <Box sx={{ p: 3, textAlign: "center" }}>
+          <Typography color="text.secondary">No recent activity</Typography>
+        </Box>
+      )}
+    </Box>
+  );
 
   return (
     <Box sx={{ minHeight: "100vh", backgroundColor: "background.default" }}>
@@ -1087,7 +885,6 @@ const Dashboard: React.FC = () => {
             {previewTemplate?.instructions ||
               "No preview available for this template."}
           </Typography>
-          {/* Additional preview content can be added here */}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPreviewTemplate(null)}>Close</Button>

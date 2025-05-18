@@ -27,30 +27,31 @@ import {
 import Header from "../components/Header";
 import type { Template, VersionHistory } from "../types";
 
+type ExampleType = { "User Input": string; "Expected Output": string };
+
+function normalizeExamples(examples: any): ExampleType[] {
+  if (!Array.isArray(examples)) return [];
+  return examples.map((ex) => {
+    if ("User Input" in ex && "Expected Output" in ex) return ex;
+    if ("userInput" in ex || "expectedOutput" in ex) {
+      return {
+        "User Input": ex.userInput ?? "",
+        "Expected Output": ex.expectedOutput ?? "",
+      };
+    }
+    return { "User Input": "", "Expected Output": "" };
+  });
+}
+
 const UpdateTemplate: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState<Template>({
-    id: "",
-    name: "",
-    department: "",
-    appCode: "",
-    content: "",
-    instructions: "",
-    examples: [],
-    version: "",
-    createdBy: "",
-    createdAt: "",
-    updatedBy: "",
-    updatedAt: "",
-  });
+  const [formData, setFormData] = useState<Template | null>(null);
   const [versionHistory, setVersionHistory] = useState<VersionHistory[]>([]);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-
-  // New state variables for enhanced delete functionality
   const [deleteComment, setDeleteComment] = useState("");
   const [deleteStatus, setDeleteStatus] = useState<
     "idle" | "loading" | "success" | "pending_approval" | "error"
@@ -59,72 +60,66 @@ const UpdateTemplate: React.FC = () => {
   const [deleteMessage, setDeleteMessage] = useState("");
 
   useEffect(() => {
-    const loadTemplate = async () => {
-      if (!id) return;
-      setIsLoading(true);
-      try {
-        const [template, history] = await Promise.all([
-          getTemplate(id),
-          getVersionHistory(id),
-        ]);
-        setFormData(template);
-        setVersionHistory(history);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load template"
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadTemplate();
+    if (!id) return;
+    setIsLoading(true);
+    Promise.all([getTemplate(id), getVersionHistory(id)])
+      .then(([template, history]) => {
+        if (!template) {
+          setError("Template not found or failed to load.");
+          setFormData(null);
+          setVersionHistory([]);
+          return;
+        }
+        setFormData({
+          id: template.id || "",
+          name: template.name || "",
+          department: template.department || "",
+          appCode: template.appCode || "",
+          content: template.content || "",
+          instructions: template.instructions || "",
+          examples: normalizeExamples(template.examples),
+          version: template.version || "",
+          createdBy: template.createdBy || "",
+          createdAt: template.createdAt || "",
+          updatedBy: template.updatedBy || "",
+          updatedAt: template.updatedAt || "",
+        });
+        setVersionHistory(history || []);
+      })
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : String(err))
+      )
+      .finally(() => setIsLoading(false));
   }, [id]);
+
+  const examples: ExampleType[] = normalizeExamples(formData?.examples || []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData) return;
     setIsLoading(true);
     setError("");
-
     try {
-      if (!formData.id) {
-        throw new Error("Template ID is missing");
-      }
-
-      console.log("Submitting update for template:", formData);
-
       const updatedTemplate = await updateTemplate({
-        id: formData.id,
-        name: formData.name,
-        department: formData.department,
-        appCode: formData.appCode,
-        content: formData.content,
-        instructions: formData.instructions,
-        examples: formData.examples,
+        ...formData,
+        examples,
       });
-
-      console.log("Template updated successfully:", updatedTemplate);
       setMessage("Template updated successfully!");
-
-      // Navigate to the updated template's view page after a short delay
       setTimeout(() => {
         navigate(`/view-template/${updatedTemplate.id}`);
       }, 1500);
     } catch (err) {
-      console.error("Error updating template:", err);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Enhanced delete functionality
   const handleDelete = async () => {
     setDeleteStatus("loading");
     setError("");
-
     try {
       const result = await deleteTemplate(id || "", deleteComment);
-
       if (result.status === "pending_approval") {
         setDeleteStatus("pending_approval");
         setDeletePrUrl(result.pullRequestUrl || "");
@@ -134,8 +129,6 @@ const UpdateTemplate: React.FC = () => {
       } else {
         setDeleteStatus("success");
         setDeleteMessage(result.message || "Template deleted successfully");
-
-        // Navigate away after a short delay for successful immediate deletion
         setTimeout(() => {
           navigate("/");
         }, 1500);
@@ -149,12 +142,9 @@ const UpdateTemplate: React.FC = () => {
   };
 
   const handleCloseDeleteDialog = () => {
-    // If user closed dialog after a successful pending approval, navigate home
     if (deleteStatus === "pending_approval") {
       navigate("/");
     }
-
-    // Reset delete dialog state
     setOpenDeleteDialog(false);
     setDeleteComment("");
     setDeleteStatus("idle");
@@ -171,6 +161,21 @@ const UpdateTemplate: React.FC = () => {
         minHeight="100vh"
       >
         <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!formData) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="100vh"
+      >
+        <Typography color="error">
+          Template not found or failed to load.
+        </Typography>
       </Box>
     );
   }
@@ -200,14 +205,12 @@ const UpdateTemplate: React.FC = () => {
                   fullWidth
                   label="Name"
                   value={formData.name}
-                  InputProps={{
-                    readOnly: true,
-                  }}
+                  InputProps={{ readOnly: true }}
                   helperText="Template name cannot be changed"
-                  sx={{ 
-                    '& .MuiInputBase-input.Mui-readOnly': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.04)'
-                    }
+                  sx={{
+                    "& .MuiInputBase-input.Mui-readOnly": {
+                      backgroundColor: "rgba(0, 0, 0, 0.04)",
+                    },
                   }}
                 />
               </Grid>
@@ -216,9 +219,13 @@ const UpdateTemplate: React.FC = () => {
                   fullWidth
                   label="Department"
                   value={formData.department}
-                  onChange={(e) =>
-                    setFormData({ ...formData, department: e.target.value })
-                  }
+                  InputProps={{ readOnly: true }}
+                  helperText="Department cannot be changed"
+                  sx={{
+                    "& .MuiInputBase-input.Mui-readOnly": {
+                      backgroundColor: "rgba(0, 0, 0, 0.04)",
+                    },
+                  }}
                   required
                 />
               </Grid>
@@ -227,9 +234,13 @@ const UpdateTemplate: React.FC = () => {
                   fullWidth
                   label="App Code"
                   value={formData.appCode}
-                  onChange={(e) =>
-                    setFormData({ ...formData, appCode: e.target.value })
-                  }
+                  InputProps={{ readOnly: true }}
+                  helperText="App Code cannot be changed"
+                  sx={{
+                    "& .MuiInputBase-input.Mui-readOnly": {
+                      backgroundColor: "rgba(0, 0, 0, 0.04)",
+                    },
+                  }}
                   required
                 />
               </Grid>
@@ -263,15 +274,18 @@ const UpdateTemplate: React.FC = () => {
                 <Typography variant="subtitle1" gutterBottom>
                   Examples
                 </Typography>
-                {formData.examples.map((example, index) => (
+                {examples.map((example, index) => (
                   <Box key={index} sx={{ mb: 2 }}>
                     <TextField
                       fullWidth
                       label="User Input"
                       value={example["User Input"]}
                       onChange={(e) => {
-                        const newExamples = [...formData.examples];
-                        newExamples[index]["User Input"] = e.target.value;
+                        const newExamples = [...examples];
+                        newExamples[index] = {
+                          ...newExamples[index],
+                          "User Input": e.target.value,
+                        };
                         setFormData({ ...formData, examples: newExamples });
                       }}
                       sx={{ mb: 1 }}
@@ -281,8 +295,11 @@ const UpdateTemplate: React.FC = () => {
                       label="Expected Output"
                       value={example["Expected Output"]}
                       onChange={(e) => {
-                        const newExamples = [...formData.examples];
-                        newExamples[index]["Expected Output"] = e.target.value;
+                        const newExamples = [...examples];
+                        newExamples[index] = {
+                          ...newExamples[index],
+                          "Expected Output": e.target.value,
+                        };
                         setFormData({ ...formData, examples: newExamples });
                       }}
                     />
@@ -290,21 +307,20 @@ const UpdateTemplate: React.FC = () => {
                 ))}
                 <Button
                   variant="outlined"
-                  onClick={() => {
+                  onClick={() =>
                     setFormData({
                       ...formData,
                       examples: [
-                        ...formData.examples,
+                        ...examples,
                         { "User Input": "", "Expected Output": "" },
                       ],
-                    });
-                  }}
+                    })
+                  }
                 >
                   Add Example
                 </Button>
               </Grid>
             </Grid>
-
             <Box sx={{ mt: 3, display: "flex", gap: 2 }}>
               <Button type="submit" variant="contained" disabled={isLoading}>
                 Save Changes

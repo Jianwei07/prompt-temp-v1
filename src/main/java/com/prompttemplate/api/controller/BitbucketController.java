@@ -1,19 +1,11 @@
 package com.prompttemplate.api.controller;
 
-import java.util.Map;
-
+import com.prompttemplate.api.service.BitbucketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import com.prompttemplate.api.service.BitbucketService;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/bitbucket")
@@ -35,19 +27,6 @@ public class BitbucketController {
         }
     }
 
-    @GetMapping("/appcodes")
-public ResponseEntity<?> getAppCodesByDepartment(@RequestParam String department) {
-    try {
-        var appCodes = bitbucketService.getAppCodesByDepartment(department);
-        return ResponseEntity.ok(Map.of("success", true, "appCodes", appCodes));
-    } catch (Exception e) {
-        return ResponseEntity.status(500).body(Map.of("success", false, "error", e.getMessage()));
-    }
-}
-
-
-    // Optional: Webhook endpoint. Remove if not used by your CI/CD/Bitbucket
-    // automation.
     @PostMapping("/webhooks")
     public ResponseEntity<?> handleWebhook(
             @RequestHeader("x-event-key") String event,
@@ -55,19 +34,8 @@ public ResponseEntity<?> getAppCodesByDepartment(@RequestParam String department
         try {
             bitbucketService.handleWebhookEvent(event, body);
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(); // Just log
         }
         return ResponseEntity.ok(Map.of("success", true));
-    }
-
-    // Optional: Version history endpoint (stub)
-    @GetMapping("/template/{id}/history")
-    public ResponseEntity<?> getTemplateHistory(@PathVariable String id) {
-        try {
-            var history = bitbucketService.getTemplateHistory(id);
-            return ResponseEntity.ok(Map.of("success", true, "history", history));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("success", false, "error", e.getMessage()));
-        }
     }
 }

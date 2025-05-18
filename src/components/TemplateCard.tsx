@@ -22,7 +22,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import React from "react";
+import React, { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import useDeleteTemplate from "../hooks/useDeleteTemplate";
 import { Template } from "../types";
@@ -31,6 +31,8 @@ interface TemplateCardProps {
   template: Template;
   onDelete?: () => void;
 }
+
+const MAX_CONTENT_LENGTH = 80;
 
 const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
   const {
@@ -43,11 +45,25 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
     handleCloseDeleteDialog,
   } = useDeleteTemplate(template.id, onDelete);
 
+  // Explicitly control dialog open
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const handleOpenDeleteDialog = () => setDeleteDialogOpen(true);
+  const handleFullCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    handleCloseDeleteDialog();
+  };
+
   return (
     <>
       <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
         <CardContent sx={{ flexGrow: 1 }}>
-          <Typography gutterBottom variant="h6" component="div">
+          <Typography
+            gutterBottom
+            variant="h6"
+            noWrap
+            title={template.name || "Untitled"}
+          >
             {template.name || "Untitled"}
           </Typography>
 
@@ -64,19 +80,51 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
               size="small"
               sx={{ mb: 1 }}
             />
+            {Array.isArray(template.examples) &&
+              template.examples.length > 0 && (
+                <Chip
+                  label={`${template.examples.length} Example${
+                    template.examples.length > 1 ? "s" : ""
+                  }`}
+                  size="small"
+                  sx={{ mb: 1, ml: 1 }}
+                  color="info"
+                />
+              )}
           </Box>
 
-          <Typography variant="body2" color="text.secondary" paragraph>
-            {template.content?.substring(0, 80) || "No content"}
-            {template.content && template.content.length > 80 ? "..." : ""}
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            paragraph
+            sx={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
+              minHeight: 50,
+            }}
+          >
+            {(template.content || "No content").length > MAX_CONTENT_LENGTH
+              ? template.content?.substring(0, MAX_CONTENT_LENGTH) + "..."
+              : template.content || "No content"}
           </Typography>
 
-          <Box sx={{ mt: 2 }}>
+          <Box sx={{ mt: 1 }}>
             <Chip
               label={`v${template.version || "0.0.1"}`}
               size="small"
               variant="outlined"
+              sx={{ mr: 1 }}
             />
+            {template.updatedAt && (
+              <Chip
+                label={new Date(template.updatedAt).toLocaleDateString()}
+                size="small"
+                variant="outlined"
+              />
+            )}
           </Box>
         </CardContent>
 
@@ -108,7 +156,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
             <IconButton
               size="small"
               color="error"
-              onClick={() => setDeleteComment("")}
+              onClick={handleOpenDeleteDialog}
             >
               <DeleteIcon />
             </IconButton>
@@ -117,9 +165,9 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
       </Card>
 
       <Dialog
-        open={deleteStatus !== "idle"}
+        open={deleteDialogOpen || deleteStatus !== "idle"}
         onClose={
-          deleteStatus === "loading" ? undefined : handleCloseDeleteDialog
+          deleteStatus === "loading" ? undefined : handleFullCloseDeleteDialog
         }
         maxWidth="sm"
         fullWidth
@@ -131,9 +179,8 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
           {deleteStatus === "idle" && (
             <>
               <DialogContentText>
-                Are you sure you want to delete the template "{template.name}"?
-                This action may require approval from a department
-                administrator.
+                Are you sure you want to delete "{template.name}"? This action
+                may require approval.
               </DialogContentText>
               <TextField
                 fullWidth
@@ -146,19 +193,16 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
               />
             </>
           )}
-
           {deleteStatus === "loading" && (
             <Box sx={{ display: "flex", justifyContent: "center", my: 2 }}>
               <CircularProgress />
             </Box>
           )}
-
           {deleteStatus === "error" && (
             <Alert severity="error" sx={{ mt: 2 }}>
               {error || "Failed to delete template. Please try again."}
             </Alert>
           )}
-
           {deleteStatus === "success" && (
             <Alert severity="success">
               {deleteMessage || "Template deleted successfully!"}
@@ -168,13 +212,13 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
         <DialogActions>
           {deleteStatus === "idle" ? (
             <>
-              <Button onClick={handleCloseDeleteDialog}>Cancel</Button>
+              <Button onClick={handleFullCloseDeleteDialog}>Cancel</Button>
               <Button onClick={handleDelete} color="error" variant="contained">
                 Delete
               </Button>
             </>
           ) : (
-            <Button onClick={handleCloseDeleteDialog} color="primary">
+            <Button onClick={handleFullCloseDeleteDialog} color="primary">
               {deleteStatus === "success" ? "Close" : "Cancel"}
             </Button>
           )}
