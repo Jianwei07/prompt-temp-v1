@@ -1,41 +1,41 @@
-import React, { useEffect, useState, Suspense } from "react";
-import {
-  Grid,
-  Typography,
-  Button,
-  Container,
-  Box,
-  Paper,
-  IconButton,
-  Breadcrumbs,
-  Card,
-  CardContent,
-  Divider,
-  Chip,
-  List,
-  Tooltip,
-  Skeleton,
-  Alert,
-  Fade,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-} from "@mui/material";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { getRecentActivities, getTemplates } from "../services/templateService";
-import ActivityItem from "../components/ActivityItem";
-import Header from "../components/Header";
-import type { Activity, Template } from "../types";
 import AddIcon from "@mui/icons-material/Add";
+import DescriptionIcon from "@mui/icons-material/Description";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import FolderIcon from "@mui/icons-material/Folder";
-import DescriptionIcon from "@mui/icons-material/Description";
 import HomeIcon from "@mui/icons-material/Home";
-import NavigateNextIcon from "@mui/icons-material/NavigateNext";
-import VisibilityIcon from "@mui/icons-material/Visibility";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
+import NavigateNextIcon from "@mui/icons-material/NavigateNext";
 import SearchIcon from "@mui/icons-material/Search";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import {
+    Alert,
+    Box,
+    Breadcrumbs,
+    Button,
+    Card,
+    CardContent,
+    Chip,
+    Container,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    Divider,
+    Fade,
+    Grid,
+    IconButton,
+    List,
+    Paper,
+    Skeleton,
+    Tooltip,
+    Typography,
+} from "@mui/material";
+import React, { Suspense, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import ActivityItem from "../components/ActivityItem";
+import Header from "../components/Header";
+import { getRecentActivities, getTemplates } from "../services/templateService";
+import type { Activity, Template } from "../types";
 
 const LazyTemplateCard = React.lazy(() => import("../components/TemplateCard"));
 
@@ -76,6 +76,11 @@ const Dashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showFilterOptions, setShowFilterOptions] = useState<boolean>(false);
   const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
+
+  const createDeleteHandler = (templateId: string) => () => {
+    console.log("Dashboard: handleDelete called for template:", templateId);
+    setTemplates((prev: Template[]) => prev.filter((t: Template) => t.id !== templateId));
+  };
 
   useEffect(() => {
     const state = location.state as {
@@ -712,7 +717,7 @@ const Dashboard: React.FC = () => {
               <Grid item xs={12} sm={6} key={template.id}>
                 <Box sx={{ position: "relative" }}>
                   <Suspense fallback={<TemplateCardSkeleton />}>
-                    <LazyTemplateCard template={template} />
+                    <LazyTemplateCard template={template} onDelete={createDeleteHandler(template.id)} />
                   </Suspense>
                   <Box
                     sx={{
@@ -807,7 +812,7 @@ const Dashboard: React.FC = () => {
           {getRecentTemplates().map((template) => (
             <Box key={template.id} sx={{ mb: 2 }}>
               <Suspense fallback={<TemplateCardSkeleton />}>
-                <LazyTemplateCard template={template} />
+                <LazyTemplateCard template={template} onDelete={createDeleteHandler(template.id)} />
               </Suspense>
             </Box>
           ))}

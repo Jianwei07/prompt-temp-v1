@@ -1,3 +1,5 @@
+// src/components/TemplateCard.tsx
+
 import BusinessIcon from "@mui/icons-material/Business";
 import CodeIcon from "@mui/icons-material/Code";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -35,6 +37,7 @@ interface TemplateCardProps {
 const MAX_CONTENT_LENGTH = 80;
 
 const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
+  console.log(">>> TemplateCard onDelete prop:", onDelete);
   const {
     deleteStatus,
     deleteMessage,
@@ -45,13 +48,19 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
     handleCloseDeleteDialog,
   } = useDeleteTemplate(template.id, onDelete);
 
-  // Explicitly control dialog open
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const handleOpenDeleteDialog = () => setDeleteDialogOpen(true);
+
   const handleFullCloseDeleteDialog = () => {
     setDeleteDialogOpen(false);
     handleCloseDeleteDialog();
+
+    // Restore focus to delete button
+    const deleteButton = document.getElementById(`delete-btn-${template.id}`);
+    if (deleteButton) {
+      deleteButton.focus();
+    }
   };
 
   return (
@@ -80,17 +89,14 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
               size="small"
               sx={{ mb: 1 }}
             />
-            {Array.isArray(template.examples) &&
-              template.examples.length > 0 && (
-                <Chip
-                  label={`${template.examples.length} Example${
-                    template.examples.length > 1 ? "s" : ""
-                  }`}
-                  size="small"
-                  sx={{ mb: 1, ml: 1 }}
-                  color="info"
-                />
-              )}
+            {Array.isArray(template.examples) && template.examples.length > 0 && (
+              <Chip
+                label={`${template.examples.length} Example${template.examples.length > 1 ? "s" : ""}`}
+                size="small"
+                sx={{ mb: 1, ml: 1 }}
+                color="info"
+              />
+            )}
           </Box>
 
           <Typography
@@ -107,7 +113,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
             }}
           >
             {(template.content || "No content").length > MAX_CONTENT_LENGTH
-              ? template.content?.substring(0, MAX_CONTENT_LENGTH) + "..."
+              ? `${template.content.substring(0, MAX_CONTENT_LENGTH)}...`
               : template.content || "No content"}
           </Typography>
 
@@ -152,8 +158,10 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
               </IconButton>
             </Tooltip>
           </Box>
+
           <Tooltip title="Delete template">
             <IconButton
+              id={`delete-btn-${template.id}`}
               size="small"
               color="error"
               onClick={handleOpenDeleteDialog}
@@ -166,9 +174,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
 
       <Dialog
         open={deleteDialogOpen || deleteStatus !== "idle"}
-        onClose={
-          deleteStatus === "loading" ? undefined : handleFullCloseDeleteDialog
-        }
+        onClose={deleteStatus === "loading" ? undefined : handleFullCloseDeleteDialog}
         maxWidth="sm"
         fullWidth
       >

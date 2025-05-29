@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { deleteTemplate } from "../services/templateService";
 
 interface UseDeleteTemplateProps {
   deleteStatus: "idle" | "loading" | "success" | "error";
@@ -24,17 +25,20 @@ const useDeleteTemplate = (
   const [deleteComment, setDeleteComment] = useState("");
 
   const handleDelete = async () => {
+    console.log("Hook handleDelete started for template id:", templateId);
     setDeleteStatus("loading");
     try {
-      // Simulate API call to delete the template
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const result = await deleteTemplate(templateId, deleteComment);
       setDeleteStatus("success");
-      setDeleteMessage("Template deleted successfully.");
-      setDeletePrUrl(`https://bitbucket.org/pr/${templateId}`); // Example PR URL
+      setDeleteMessage(result.message || "Template deleted successfully.");
+      if (result.pullRequestUrl) {
+        setDeletePrUrl(result.pullRequestUrl);
+      }
+      console.log("Hook handleDelete calling onDelete prop");
       if (onDelete) onDelete();
     } catch (err) {
       setDeleteStatus("error");
-      setError("Failed to delete the template.");
+      setError(err instanceof Error ? err.message : "Failed to delete the template.");
     }
   };
 

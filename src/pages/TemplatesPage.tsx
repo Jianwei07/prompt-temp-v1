@@ -1,14 +1,24 @@
+import { Box, Chip, Container, Grid, Typography } from "@mui/material";
 import React, { useEffect, useState } from "react";
-import { Container, Grid, Typography, Box, Chip } from "@mui/material";
-import { getTemplates } from "../services/templateService";
-import TemplateCard from "../components/TemplateCard";
+import TemplateCard from "src/components/TemplateCard";
 import Header from "../components/Header";
+import { getTemplates } from "../services/templateService";
 import { Template } from "../types";
 
 const TemplatesPage: React.FC = () => {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+
+  // Added renderCount state to force re-render if needed
+  const [renderCount, setRenderCount] = useState(0);
+
+  // Centralized delete handler
+  const handleDelete = (id: string) => {
+    console.log("Removing template from list:", id);
+    setTemplates((prev) => prev.filter((t) => t.id !== id));
+    setRenderCount((c) => c + 1); // optional: triggers re-render explicitly
+  };
 
   const getUniqueDepartments = () => {
     const departments = new Set<string>();
@@ -34,18 +44,21 @@ const TemplatesPage: React.FC = () => {
     loadTemplates();
   }, []);
 
-  // Handle department selection
   const handleDepartmentSelect = (department: string) => {
     setSelectedDepartment(department);
   };
 
-  // Filter templates
   const filteredTemplates = templates.filter((template) => {
     if (selectedDepartment && template.department !== selectedDepartment) {
       return false;
     }
     return true;
   });
+
+  // Logs to debug rendering & template counts
+  console.log("TemplatesPage render, templates count:", templates.length);
+  console.log("Filtered templates count:", filteredTemplates.length);
+  console.log("Render count:", renderCount);
 
   if (isLoading) {
     return (
@@ -78,11 +91,13 @@ const TemplatesPage: React.FC = () => {
             ))}
           </Box>
         </Box>
-
         <Grid container spacing={3}>
           {filteredTemplates.map((template) => (
             <Grid item xs={12} sm={6} md={4} key={template.id}>
-              <TemplateCard template={template} />
+              <TemplateCard
+                template={template}
+                onDelete={() => handleDelete(template.id)}
+              />
             </Grid>
           ))}
         </Grid>
