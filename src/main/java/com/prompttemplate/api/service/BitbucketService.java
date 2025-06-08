@@ -17,6 +17,7 @@ import org.springframework.web.client.RestTemplate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.time.ZoneId;
 
 @Service
 public class BitbucketService {
@@ -531,9 +532,160 @@ public class BitbucketService {
         return headers;
     }
 
-    // Version history stub
+    // Version history implementation
     public List<Map<String, Object>> getTemplateHistory(String id) throws Exception {
-        return List.of();
+        List<Map<String, Object>> history = new ArrayList<>();
+        
+        try {
+            // Get template metadata to find template info
+            JsonNode metadata = fetchMetadata();
+            JsonNode templateMeta = null;
+            
+            for (JsonNode node : metadata) {
+                if (id.equals(node.path("id").asText())) {
+                    templateMeta = node;
+                    break;
+                }
+            }
+            
+            if (templateMeta == null) {
+                throw new Exception("Template not found");
+            }
+            
+            String filePath = templateMeta.path("link").asText();
+            String templateName = templateMeta.path("name").asText("Unknown");
+            String createdBy = templateMeta.path("createdBy").asText("Unknown");
+            String updatedBy = templateMeta.path("updatedBy").asText("Unknown");
+            String createdAt = templateMeta.path("createdAt").asText();
+            String updatedAt = templateMeta.path("updatedAt").asText();
+            String version = templateMeta.path("version").asText("v1.0");
+            
+            System.out.println("Template metadata - Name: " + templateName + ", CreatedBy: " + createdBy + ", UpdatedBy: " + updatedBy);
+            
+            // Try to get commit information from Bitbucket filehistory API
+            String normalizedPath = filePath.replaceAll("^/+|/+$", "");
+            String fileHistoryUrl = String.format(
+                "%s/2.0/repositories/%s/%s/filehistory/main/%s",
+                System.getenv("BITBUCKET_BASE_URL") != null ? System.getenv("BITBUCKET_BASE_URL") : "https://api.bitbucket.org",
+                workspace, repoSlug, normalizedPath
+            );
+            
+            List<Map<String, Object>> commits = new ArrayList<>();
+            try {
+                HttpHeaders headers = getHeaders();
+                ResponseEntity<String> response = restTemplate.exchange(
+                    fileHistoryUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class
+                );
+                
+                if (response.getStatusCode().is2xxSuccessful()) {
+                    JsonNode historyData = objectMapper.readTree(response.getBody());
+                    if (historyData.has("values") && historyData.get("values").isArray()) {
+                        JsonNode values = historyData.get("values");
+                        for (JsonNode entry : values) {
+                            JsonNode commit = entry.has("commit") ? entry.get("commit") : entry;
+                            Map<String, Object> commitInfo = new HashMap<>();
+                            commitInfo.put("commitId", commit.path("hash").asText(""));
+                            commitInfo.put("message", commit.path("message").asText(""));
+                            commitInfo.put("timestamp", commit.path("date").asText(""));
+                            commits.add(commitInfo);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Could not fetch commit details: " + e.getMessage());
+            }
+            
+            // Create version history entries based on metadata
+            // Entry 1: Creation entry
+            Map<String, Object> creationEntry = new HashMap<>();
+            creationEntry.put("version", "v1.0");
+            creationEntry.put("userDisplayName", createdBy);
+            
+            // Format timestamp properly (remove timezone info if present)
+            String formattedCreatedAt = formatTimestamp(createdAt);
+            creationEntry.put("timestamp", formattedCreatedAt);
+            
+            // Try to find matching commit for creation
+            String creationCommitId = "initial";
+            String creationMessage = "Initial version - " + templateName;
+            
+            if (!commits.isEmpty()) {
+                // Use the oldest commit (last in the list) for creation
+                Map<String, Object> oldestCommit = commits.get(commits.size() - 1);
+                creationCommitId = (String) oldestCommit.get("commitId");
+                String commitMsg = (String) oldestCommit.get("message");
+                if (commitMsg != null && !commitMsg.isEmpty()) {
+                    creationMessage = commitMsg;
+                }
+            }
+            
+            creationEntry.put("commitId", creationCommitId);
+            creationEntry.put("message", creationMessage);
+            history.add(creationEntry);
+            
+            // Entry 2: Update entry (if different from creation)
+            if (!createdAt.equals(updatedAt) || !createdBy.equals(updatedBy)) {
+                Map<String, Object> updateEntry = new HashMap<>();
+                updateEntry.put("version", version);
+                updateEntry.put("userDisplayName", updatedBy);
+                
+                String formattedUpdatedAt = formatTimestamp(updatedAt);
+                updateEntry.put("timestamp", formattedUpdatedAt);
+                
+                // Try to find matching commit for update
+                String updateCommitId = "update";
+                String updateMessage = "Updated template - " + templateName;
+                
+                if (!commits.isEmpty()) {
+                    // Use the newest commit (first in the list) for update
+                    Map<String, Object> newestCommit = commits.get(0);
+                    updateCommitId = (String) newestCommit.get("commitId");
+                    String commitMsg = (String) newestCommit.get("message");
+                    if (commitMsg != null && !commitMsg.isEmpty()) {
+                        updateMessage = commitMsg;
+                    }
+                }
+                
+                updateEntry.put("commitId", updateCommitId);
+                updateEntry.put("message", updateMessage);
+                history.add(updateEntry);
+            }
+            
+            // Reverse the list so newest entries appear first
+            Collections.reverse(history);
+            
+        } catch (Exception e) {
+            System.err.println("Error creating version history from metadata: " + e.getMessage());
+            e.printStackTrace();
+            
+            // Return a fallback entry
+            Map<String, Object> errorEntry = new HashMap<>();
+            errorEntry.put("commitId", "error");
+            errorEntry.put("version", "v1.0");
+            errorEntry.put("userDisplayName", "System");
+            errorEntry.put("timestamp", getUtcTimeString());
+            errorEntry.put("message", "Could not retrieve version history");
+            history.add(errorEntry);
+        }
+        
+        System.out.println("Final version history: " + history);
+        return history;
+    }
+    
+    // Helper method to format timestamp
+    private String formatTimestamp(String timestamp) {
+        if (timestamp == null || timestamp.isEmpty()) {
+            return getUtcTimeString();
+        }
+        
+        try {
+            // Parse the timestamp and convert to clean format
+            ZonedDateTime zonedTime = ZonedDateTime.parse(timestamp);
+            return zonedTime.toLocalDateTime().toString();
+        } catch (Exception e) {
+            System.err.println("Error formatting timestamp: " + timestamp + " - " + e.getMessage());
+            return timestamp;
+        }
     }
 
     // Repo structure for dropdowns
