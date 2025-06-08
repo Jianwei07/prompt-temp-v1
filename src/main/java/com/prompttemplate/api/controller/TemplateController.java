@@ -24,9 +24,8 @@ public class TemplateController {
 
     @GetMapping
     public ResponseEntity<?> getTemplates() {
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "templates", templateService.getAllTemplates()));
+        // Directly return the ResponseEntity from the service
+        return templateService.getAllTemplates();
     }
 
     @GetMapping("/{id}")

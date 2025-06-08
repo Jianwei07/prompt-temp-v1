@@ -41,6 +41,7 @@ build/Release
 # Dependency directories
 node_modules/
 jspm_packages/
+effective-pom.xml
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
@@ -90,6 +91,9 @@ out
 # Nuxt.js build / generate output
 .nuxt
 dist
+
+# Maven build output
+target/
 
 # Gatsby files
 .cache/

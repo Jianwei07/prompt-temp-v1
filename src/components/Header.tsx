@@ -10,7 +10,12 @@ const Header: React.FC<HeaderProps> = ({ title = "Prompt Library" }) => {
   return (
     <AppBar position="static" elevation={0}>
       <Toolbar>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+        <Typography
+          variant="h6"
+          sx={{ flexGrow: 1, textDecoration: "none", color: "inherit" }}
+          component={Link}
+          to="/"
+        >
           {title}
         </Typography>
         <Box sx={{ display: "flex", gap: "1rem" }}>

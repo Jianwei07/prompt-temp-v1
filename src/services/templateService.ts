@@ -269,3 +269,39 @@ export async function getBitbucketStructure(): Promise<{
     throw err;
   }
 }
+
+/**
+ * Triggers a resync of templates with Bitbucket.
+ * @param dryRun If true, performs a dry run without making changes.
+ * @returns A report of the resync operation.
+ */
+export async function resyncTemplates(dryRun: boolean): Promise<any> {
+  console.log(`Attempting to resync templates... Dry run: ${dryRun}`);
+  try {
+    const response = await fetch(`${API_BASE_URL}/bitbucket/resync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dryRun }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Error resyncing templates:", response.status, errorText);
+      throw new Error(
+        `Failed to resync templates. Status: ${response.status}, Message: ${errorText}`
+      );
+    }
+
+    const report = await response.json();
+    console.log("Resync operation completed. Report:", report);
+    return report;
+  } catch (error) {
+    console.error("Exception during template resync:", error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(
+      `An unexpected error occurred during template resync: ${String(error)}`
+    );
+  }
+}

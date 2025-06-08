@@ -12,12 +12,12 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.*;
-import java.time.ZoneId;
 
 @Service
 public class BitbucketService {
@@ -45,9 +45,43 @@ public class BitbucketService {
         this.objectMapper = objectMapper;
     }
 
-    /** Utility: Get current Singapore time (UTC+8) as ISO string (for createdAt/updatedAt) */
+    /**
+     * Utility: Get current Singapore time (UTC+8) as ISO string (for
+     * createdAt/updatedAt)
+     */
     private String getUtcTimeString() {
         return java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Singapore")).toString();
+    }
+
+    /** Utility: Increment version string (e.g., v1.0 -> v1.1, v1.9 -> v1.10) */
+    private String incrementVersion(String currentVersionStr) {
+        if (currentVersionStr == null || currentVersionStr.isBlank() || !currentVersionStr.startsWith("v")) {
+            // Default to v1.0 if current version is invalid or missing,
+            // though for an update, it should ideally always exist.
+            // Consider if an error should be thrown or logged more aggressively.
+            return "v1.0";
+        }
+        try {
+            String numericPart = currentVersionStr.substring(1); // Remove 'v'
+            String[] parts = numericPart.split("\\.");
+            if (parts.length == 2) {
+                int major = Integer.parseInt(parts[0]);
+                int minor = Integer.parseInt(parts[1]);
+                minor++; // Increment minor version
+                return "v" + major + "." + minor;
+            } else {
+                // If format is not "X.Y", default or attempt to salvage
+                // For simplicity, defaulting to v1.0 or a derivative.
+                // A more robust parser might be needed for complex version schemes.
+                System.err
+                        .println("⚠️ Unexpected version format: \"" + currentVersionStr + "\". Defaulting increment.");
+                return "v1.0"; // Or handle as an error
+            }
+        } catch (NumberFormatException e) {
+            System.err.println(
+                    "⚠️ Could not parse version: \"" + currentVersionStr + "\". Defaulting. Error: " + e.getMessage());
+            return "v1.0"; // Fallback
+        }
     }
 
     /** Utility: Parse date string, return LocalDateTime or null */
@@ -82,36 +116,36 @@ public class BitbucketService {
     /** Utility: Convert "examples" in request to canonical Example list */
     private List<Map<String, String>> processExamples(Object examplesObj) {
         List<Map<String, String>> processed = new ArrayList<>();
-        
+
         if (examplesObj instanceof List<?>) {
             List<?> exampleList = (List<?>) examplesObj;
             for (Object ex : exampleList) {
                 if (ex instanceof Map<?, ?>) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> exampleMap = (Map<String, Object>) ex;
-                    
+
                     // Get values directly using the exact keys we expect
                     String userInput = "";
                     String expectedOutput = "";
-                    
+
                     if (exampleMap.containsKey("User Input") && exampleMap.get("User Input") != null) {
                         userInput = exampleMap.get("User Input").toString();
                     }
-                    
+
                     if (exampleMap.containsKey("Expected Output") && exampleMap.get("Expected Output") != null) {
                         expectedOutput = exampleMap.get("Expected Output").toString();
                     }
-                    
+
                     // Create the processed example
                     Map<String, String> processedExample = new HashMap<>();
                     processedExample.put("User Input", userInput);
                     processedExample.put("Expected Output", expectedOutput);
-                    
+
                     processed.add(processedExample);
                 }
             }
         }
-        
+
         return processed;
     }
 
@@ -208,7 +242,7 @@ public class BitbucketService {
         String department = payload.get("department").toString();
         String appCode = payload.get("appCode").toString();
         String instructions = payload.getOrDefault("instructions", "").toString();
-        
+
         // Debug logging for examples
         System.out.println("Raw examples from payload: " + payload.get("examples"));
         Object examplesObj = payload.get("examples");
@@ -242,7 +276,7 @@ public class BitbucketService {
         ObjectNode fileContent = objectMapper.createObjectNode();
         fileContent.put("Main Prompt Content", content);
         fileContent.put("Additional Instructions", instructions);
-        
+
         // Debug logging for file content
         System.out.println("Creating file content with examples: " + processedExamples);
         ArrayNode examplesNode = objectMapper.valueToTree(processedExamples);
@@ -293,17 +327,28 @@ public class BitbucketService {
 
         String fileName = name.replaceAll("\\s+", "-") + ".json";
         String filePath = department + "/" + appCode + "/" + fileName;
+        String newVersion = "v1.0"; // Default, will be updated
 
         for (JsonNode node : metadata) {
             if (id.equals(node.path("id").asText())) {
                 ObjectNode modified = (ObjectNode) node;
+                String currentVersion = modified.path("version").asText("v1.0"); // Get current version
+                newVersion = incrementVersion(currentVersion); // Increment it
+
                 modified.put("name", name);
                 modified.put("Department", department);
                 modified.put("AppCode", appCode);
-                modified.put("version", "v1.0");
+                modified.put("version", newVersion); // Use new incremented version
                 modified.put("updatedBy", updatedBy);
                 modified.put("updatedAt", timestamp);
                 modified.put("link", filePath);
+                // Ensure 'createdBy' and 'createdAt' are preserved from the original node
+                if (modified.has("createdBy")) {
+                    modified.put("createdBy", modified.get("createdBy").asText());
+                }
+                if (modified.has("createdAt")) {
+                    modified.put("createdAt", modified.get("createdAt").asText());
+                }
                 updatedMetadata.add(modified);
 
                 updatedTemplate = new Template();
@@ -311,11 +356,14 @@ public class BitbucketService {
                 updatedTemplate.setName(name);
                 updatedTemplate.setDepartment(department);
                 updatedTemplate.setAppCode(appCode);
-                updatedTemplate.setVersion("v1.0");
+                updatedTemplate.setVersion(newVersion); // Use new incremented version for response
                 updatedTemplate.setUpdatedBy(updatedBy);
                 updatedTemplate.setUpdatedAt(ZonedDateTime.parse(timestamp).toLocalDateTime());
-                updatedTemplate.setCreatedBy(modified.get("createdBy").asText());
-                updatedTemplate.setCreatedAt(safeParseDate(modified.get("createdAt").asText(), "createdAt"));
+                updatedTemplate.setCreatedBy(modified.get("createdBy").asText()); // Get from modified node
+                updatedTemplate.setCreatedAt(safeParseDate(modified.get("createdAt").asText(), "createdAt")); // Get
+                                                                                                              // from
+                                                                                                              // modified
+                                                                                                              // node
                 updatedTemplate.setContent(content);
                 updatedTemplate.setInstructions(instructions);
                 updatedTemplate.setExamples(toExampleList(processedExamples));
@@ -535,23 +583,23 @@ public class BitbucketService {
     // Version history implementation
     public List<Map<String, Object>> getTemplateHistory(String id) throws Exception {
         List<Map<String, Object>> history = new ArrayList<>();
-        
+
         try {
             // Get template metadata to find template info
             JsonNode metadata = fetchMetadata();
             JsonNode templateMeta = null;
-            
+
             for (JsonNode node : metadata) {
                 if (id.equals(node.path("id").asText())) {
                     templateMeta = node;
                     break;
                 }
             }
-            
+
             if (templateMeta == null) {
                 throw new Exception("Template not found");
             }
-            
+
             String filePath = templateMeta.path("link").asText();
             String templateName = templateMeta.path("name").asText("Unknown");
             String createdBy = templateMeta.path("createdBy").asText("Unknown");
@@ -559,24 +607,24 @@ public class BitbucketService {
             String createdAt = templateMeta.path("createdAt").asText();
             String updatedAt = templateMeta.path("updatedAt").asText();
             String version = templateMeta.path("version").asText("v1.0");
-            
-            System.out.println("Template metadata - Name: " + templateName + ", CreatedBy: " + createdBy + ", UpdatedBy: " + updatedBy);
-            
+
+            System.out.println("Template metadata - Name: " + templateName + ", CreatedBy: " + createdBy
+                    + ", UpdatedBy: " + updatedBy);
+
             // Try to get commit information from Bitbucket filehistory API
             String normalizedPath = filePath.replaceAll("^/+|/+$", "");
             String fileHistoryUrl = String.format(
-                "%s/2.0/repositories/%s/%s/filehistory/main/%s",
-                System.getenv("BITBUCKET_BASE_URL") != null ? System.getenv("BITBUCKET_BASE_URL") : "https://api.bitbucket.org",
-                workspace, repoSlug, normalizedPath
-            );
-            
+                    "%s/2.0/repositories/%s/%s/filehistory/main/%s",
+                    System.getenv("BITBUCKET_BASE_URL") != null ? System.getenv("BITBUCKET_BASE_URL")
+                            : "https://api.bitbucket.org",
+                    workspace, repoSlug, normalizedPath);
+
             List<Map<String, Object>> commits = new ArrayList<>();
             try {
                 HttpHeaders headers = getHeaders();
                 ResponseEntity<String> response = restTemplate.exchange(
-                    fileHistoryUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class
-                );
-                
+                        fileHistoryUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
                 if (response.getStatusCode().is2xxSuccessful()) {
                     JsonNode historyData = objectMapper.readTree(response.getBody());
                     if (historyData.has("values") && historyData.get("values").isArray()) {
@@ -594,21 +642,21 @@ public class BitbucketService {
             } catch (Exception e) {
                 System.err.println("Could not fetch commit details: " + e.getMessage());
             }
-            
+
             // Create version history entries based on metadata
             // Entry 1: Creation entry
             Map<String, Object> creationEntry = new HashMap<>();
             creationEntry.put("version", "v1.0");
             creationEntry.put("userDisplayName", createdBy);
-            
+
             // Format timestamp properly (remove timezone info if present)
             String formattedCreatedAt = formatTimestamp(createdAt);
             creationEntry.put("timestamp", formattedCreatedAt);
-            
+
             // Try to find matching commit for creation
             String creationCommitId = "initial";
             String creationMessage = "Initial version - " + templateName;
-            
+
             if (!commits.isEmpty()) {
                 // Use the oldest commit (last in the list) for creation
                 Map<String, Object> oldestCommit = commits.get(commits.size() - 1);
@@ -618,24 +666,24 @@ public class BitbucketService {
                     creationMessage = commitMsg;
                 }
             }
-            
+
             creationEntry.put("commitId", creationCommitId);
             creationEntry.put("message", creationMessage);
             history.add(creationEntry);
-            
+
             // Entry 2: Update entry (if different from creation)
             if (!createdAt.equals(updatedAt) || !createdBy.equals(updatedBy)) {
                 Map<String, Object> updateEntry = new HashMap<>();
                 updateEntry.put("version", version);
                 updateEntry.put("userDisplayName", updatedBy);
-                
+
                 String formattedUpdatedAt = formatTimestamp(updatedAt);
                 updateEntry.put("timestamp", formattedUpdatedAt);
-                
+
                 // Try to find matching commit for update
                 String updateCommitId = "update";
                 String updateMessage = "Updated template - " + templateName;
-                
+
                 if (!commits.isEmpty()) {
                     // Use the newest commit (first in the list) for update
                     Map<String, Object> newestCommit = commits.get(0);
@@ -645,19 +693,19 @@ public class BitbucketService {
                         updateMessage = commitMsg;
                     }
                 }
-                
+
                 updateEntry.put("commitId", updateCommitId);
                 updateEntry.put("message", updateMessage);
                 history.add(updateEntry);
             }
-            
+
             // Reverse the list so newest entries appear first
             Collections.reverse(history);
-            
+
         } catch (Exception e) {
             System.err.println("Error creating version history from metadata: " + e.getMessage());
             e.printStackTrace();
-            
+
             // Return a fallback entry
             Map<String, Object> errorEntry = new HashMap<>();
             errorEntry.put("commitId", "error");
@@ -667,17 +715,17 @@ public class BitbucketService {
             errorEntry.put("message", "Could not retrieve version history");
             history.add(errorEntry);
         }
-        
+
         System.out.println("Final version history: " + history);
         return history;
     }
-    
+
     // Helper method to format timestamp
     private String formatTimestamp(String timestamp) {
         if (timestamp == null || timestamp.isEmpty()) {
             return getUtcTimeString();
         }
-        
+
         try {
             // Parse the timestamp and convert to clean format
             ZonedDateTime zonedTime = ZonedDateTime.parse(timestamp);
@@ -716,5 +764,165 @@ public class BitbucketService {
     // Webhook (optional, just a stub)
     public void handleWebhookEvent(String event, Map<String, Object> body) {
         System.out.println("Received webhook event: " + event);
+    }
+
+    /**
+     * Helper method to check if a file exists in Bitbucket at the given path.
+     * The path should be relative to the repository root, e.g.,
+     * "src/main/resources/Department/AppCode/file.json".
+     * Assumes the default branch is "main".
+     */
+    private boolean checkFileExistsInBitbucket(String filePathInRepo) {
+        // Use a common default branch name. Adjust if your repository uses "master" or
+        // another default.
+        String defaultBranch = "main";
+        String url = String.format("https://api.bitbucket.org/2.0/repositories/%s/%s/src/%s/%s",
+                this.workspace, this.repoSlug, defaultBranch, filePathInRepo);
+
+        try {
+            HttpHeaders headers = getHeaders(); // Assuming getHeaders() provides necessary auth
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            // We are only interested in whether the file exists, so a HEAD request or GET
+            // and checking status is fine.
+            // RestTemplate.exchange can provide the status code.
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+
+            // If we get a 2xx status, the file exists.
+            return response.getStatusCode().is2xxSuccessful();
+        } catch (HttpClientErrorException.NotFound nfex) {
+            // 404 Not Found means the file does not exist.
+            return false;
+        } catch (HttpClientErrorException ex) {
+            // Other client errors (4xx) could mean issues with permissions or the request
+            // itself.
+            System.err.println("Client error while checking file existence for '" + filePathInRepo + "': "
+                    + ex.getStatusCode() + " " + ex.getResponseBodyAsString());
+            return false; // Treat as not existing for safety, or handle more specifically if needed.
+        } catch (Exception e) {
+            // Other exceptions (network issues, server errors 5xx, etc.)
+            System.err.println("Error checking file existence for '" + filePathInRepo + "': " + e.getMessage());
+            return false; // Treat as not existing for safety.
+        }
+    }
+
+    public Map<String, Object> resyncMetadata(boolean dryRun) throws Exception {
+        System.out.println("Starting metadata resync. Dry run: " + dryRun);
+        JsonNode currentMetadataNode = fetchMetadata();
+        if (!currentMetadataNode.isArray()) {
+            throw new RuntimeException("metadata.json is not an array or is malformed.");
+        }
+        ArrayNode currentMetadata = (ArrayNode) currentMetadataNode;
+        ArrayNode newMetadata = objectMapper.createArrayNode();
+        Map<String, Object> report = new HashMap<>();
+        List<String> actionsTaken = new ArrayList<>();
+        List<String> errorsEncountered = new ArrayList<>();
+
+        // --- Pass 1: Identify and handle orphans ---
+        System.out.println("Resync Pass 1: Identifying orphaned entries...");
+        List<JsonNode> validEntriesAfterOrphanCheck = new ArrayList<>();
+        for (JsonNode entry : currentMetadata) {
+            String filePath = entry.path("link").asText(null);
+            String id = entry.path("id").asText("UNKNOWN_ID");
+            if (filePath == null || filePath.isBlank()) {
+                actionsTaken.add((dryRun ? "[DRY RUN] Would remove" : "Removed") + " entry with ID " + id
+                        + " due to missing/blank file path.");
+                continue; // Skip this entry, it will be removed
+            }
+            if (!checkFileExistsInBitbucket(filePath)) {
+                actionsTaken.add((dryRun ? "[DRY RUN] Would remove" : "Removed") + " orphaned entry: ID " + id
+                        + ", file " + filePath + " not found.");
+            } else {
+                validEntriesAfterOrphanCheck.add(entry);
+            }
+        }
+        System.out.println(
+                "Resync Pass 1: Completed. Valid entries after orphan check: " + validEntriesAfterOrphanCheck.size());
+
+        // --- Pass 2: Identify and resolve duplicates from the valid entries ---
+        System.out.println("Resync Pass 2: Identifying and resolving duplicates...");
+        Map<String, JsonNode> uniqueEntries = new HashMap<>();
+        for (JsonNode entry : validEntriesAfterOrphanCheck) {
+            String department = entry.path("Department").asText();
+            String appCode = entry.path("AppCode").asText();
+            String name = entry.path("name").asText();
+            // Normalize version for comparison, e.g., treat "v1.0" and "v1" differently if
+            // needed, or standardize.
+            // For now, using exact version string.
+            String version = entry.path("version").asText();
+            String updatedAtStr = entry.path("updatedAt").asText();
+            String id = entry.path("id").asText("NO_ID_IN_DUPLICATE_CHECK");
+
+            String uniqueKey = department + "|" + appCode + "|" + name + "|" + version;
+
+            if (uniqueEntries.containsKey(uniqueKey)) {
+                JsonNode existingEntry = uniqueEntries.get(uniqueKey);
+                String existingUpdatedAtStr = existingEntry.path("updatedAt").asText();
+                LocalDateTime currentEntryDate = safeParseDate(updatedAtStr, "updatedAt for " + id);
+                LocalDateTime existingEntryDate = safeParseDate(existingUpdatedAtStr,
+                        "updatedAt for " + existingEntry.path("id").asText());
+
+                String actionMsgPrefix = (dryRun ? "[DRY RUN] Would resolve duplicate for key '" + uniqueKey + "': "
+                        : "Resolved duplicate for key '" + uniqueKey + "': ");
+
+                if (currentEntryDate != null
+                        && (existingEntryDate == null || currentEntryDate.isAfter(existingEntryDate))) {
+                    actionsTaken.add(actionMsgPrefix + "Kept ID " + id + " (newer: " + updatedAtStr + "), discarded ID "
+                            + existingEntry.path("id").asText() + " (older: " + existingUpdatedAtStr + ")");
+                    uniqueEntries.put(uniqueKey, entry); // Current entry is newer or existing has no valid date
+                } else if (currentEntryDate == null && existingEntryDate != null) {
+                    actionsTaken.add(actionMsgPrefix + "Kept ID " + existingEntry.path("id").asText() + " (valid date: "
+                            + existingUpdatedAtStr + "), discarded ID " + id + " (invalid date: " + updatedAtStr + ")");
+                    // Existing entry stays, current one is discarded (invalid date)
+                } else if (currentEntryDate != null && existingEntryDate != null
+                        && currentEntryDate.isBefore(existingEntryDate)) {
+                    actionsTaken.add(actionMsgPrefix + "Kept ID " + existingEntry.path("id").asText() + " (newer: "
+                            + existingUpdatedAtStr + "), discarded ID " + id + " (older: " + updatedAtStr + ")");
+                    // Existing entry is newer, current one is discarded
+                } else {
+                    // Dates are equal or both are null. Keep the one already in uniqueEntries
+                    // (first encountered or arbitrary).
+                    // Or, if IDs are different, could log a specific warning about
+                    // indistinguishable duplicates.
+                    actionsTaken.add(actionMsgPrefix + "Kept ID " + existingEntry.path("id").asText()
+                            + " (first encountered/equal date), discarded ID " + id + ". Dates: current=" + updatedAtStr
+                            + ", existing=" + existingUpdatedAtStr);
+                }
+            } else {
+                uniqueEntries.put(uniqueKey, entry);
+            }
+        }
+        System.out.println("Resync Pass 2: Completed. Unique entries after duplicate check: " + uniqueEntries.size());
+
+        // Populate newMetadata with the resolved unique entries
+        for (JsonNode entry : uniqueEntries.values()) {
+            newMetadata.add(entry);
+        }
+
+        report.put("orphans_processed_count", currentMetadata.size() - validEntriesAfterOrphanCheck.size());
+        report.put("duplicates_processed_count", validEntriesAfterOrphanCheck.size() - uniqueEntries.size());
+        report.put("final_metadata_entry_count", newMetadata.size());
+        report.put("actions_taken", actionsTaken);
+        report.put("errors", errorsEncountered); // Currently not populated, add error logging if specific cases arise
+
+        if (!dryRun) {
+            System.out.println("Committing changes to metadata.json...");
+            if (currentMetadata.equals(newMetadata)) {
+                actionsTaken.add("No changes detected in metadata.json after resync. Commit skipped.");
+                System.out.println("No changes to commit.");
+            } else {
+                commitFiles("System: Resync metadata.json", Map.of("metadata.json",
+                        objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(newMetadata)));
+                actionsTaken.add("Committed updated metadata.json to Bitbucket.");
+                System.out.println("Successfully committed updated metadata.json.");
+            }
+        } else {
+            System.out.println("Dry run complete. No changes were committed.");
+            actionsTaken.add("Dry run: No changes committed to Bitbucket.");
+        }
+
+        System.out.println(
+                "Resync metadata report: " + objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(report));
+        return report;
     }
 }

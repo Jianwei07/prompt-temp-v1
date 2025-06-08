@@ -1,5 +1,6 @@
 package com.prompttemplate.api.controller;
 
+import com.prompttemplate.api.dto.ResyncRequest;
 import com.prompttemplate.api.service.BitbucketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -37,5 +38,22 @@ public class BitbucketController {
             e.printStackTrace(); // Just log
         }
         return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    // New endpoint for resyncing metadata
+    @PostMapping("/resync")
+    public ResponseEntity<?> resyncMetadata(@RequestBody ResyncRequest resyncRequest) { // Changed to use @RequestBody
+        try {
+            // IMPORTANT: Secure this endpoint appropriately if it's not already covered by
+            // broader security.
+            Map<String, Object> report = bitbucketService.resyncMetadata(resyncRequest.isDryRun()); // Get dryRun from
+                                                                                                    // the request body
+            return ResponseEntity.ok(Map.of("success", true, "report", report));
+        } catch (Exception e) {
+            // Log the exception properly in a real application
+            e.printStackTrace();
+            return ResponseEntity.status(500)
+                    .body(Map.of("success", false, "error", "Failed to resync metadata: " + e.getMessage()));
+        }
     }
 }

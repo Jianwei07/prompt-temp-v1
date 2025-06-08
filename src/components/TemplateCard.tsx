@@ -89,14 +89,17 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
               size="small"
               sx={{ mb: 1 }}
             />
-            {Array.isArray(template.examples) && template.examples.length > 0 && (
-              <Chip
-                label={`${template.examples.length} Example${template.examples.length > 1 ? "s" : ""}`}
-                size="small"
-                sx={{ mb: 1, ml: 1 }}
-                color="info"
-              />
-            )}
+            {Array.isArray(template.examples) &&
+              template.examples.length > 0 && (
+                <Chip
+                  label={`${template.examples.length} Example${
+                    template.examples.length > 1 ? "s" : ""
+                  }`}
+                  size="small"
+                  sx={{ mb: 1, ml: 1 }}
+                  color="info"
+                />
+              )}
           </Box>
 
           <Typography
@@ -119,14 +122,21 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
 
           <Box sx={{ mt: 1 }}>
             <Chip
-              label={`v${template.version || "0.0.1"}`}
+              label={`${template.version || "0.0.1"}`}
               size="small"
               variant="outlined"
               sx={{ mr: 1 }}
             />
             {template.updatedAt && (
               <Chip
-                label={new Date(template.updatedAt).toLocaleDateString()}
+                label={new Date(template.updatedAt).toLocaleDateString(
+                  "en-GB",
+                  {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  }
+                )}
                 size="small"
                 variant="outlined"
               />
@@ -174,7 +184,9 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onDelete }) => {
 
       <Dialog
         open={deleteDialogOpen || deleteStatus !== "idle"}
-        onClose={deleteStatus === "loading" ? undefined : handleFullCloseDeleteDialog}
+        onClose={
+          deleteStatus === "loading" ? undefined : handleFullCloseDeleteDialog
+        }
         maxWidth="sm"
         fullWidth
       >
