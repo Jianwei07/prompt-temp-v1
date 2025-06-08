@@ -44,9 +44,9 @@ public class BitbucketService {
         this.objectMapper = objectMapper;
     }
 
-    /** Utility: Get current UTC as ISO string (for createdAt/updatedAt) */
+    /** Utility: Get current Singapore time (UTC+8) as ISO string (for createdAt/updatedAt) */
     private String getUtcTimeString() {
-        return java.time.Instant.now().toString();
+        return java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Singapore")).toString();
     }
 
     /** Utility: Parse date string, return LocalDateTime or null */
@@ -81,22 +81,36 @@ public class BitbucketService {
     /** Utility: Convert "examples" in request to canonical Example list */
     private List<Map<String, String>> processExamples(Object examplesObj) {
         List<Map<String, String>> processed = new ArrayList<>();
-        if (examplesObj instanceof List<?> exampleList) {
+        
+        if (examplesObj instanceof List<?>) {
+            List<?> exampleList = (List<?>) examplesObj;
             for (Object ex : exampleList) {
-                if (ex instanceof Map<?, ?> map) {
-                    // Try all possible user input/output keys, fallback to empty
-                    String input = map.get("input") != null ? map.get("input").toString()
-                            : map.get("userInput") != null ? map.get("userInput").toString()
-                                    : map.get("question") != null ? map.get("question").toString() : "";
-                    String output = map.get("output") != null ? map.get("output").toString()
-                            : map.get("expectedOutput") != null ? map.get("expectedOutput").toString()
-                                    : map.get("answer") != null ? map.get("answer").toString() : "";
-                    processed.add(Map.of(
-                            "User Input", input,
-                            "Expected Output", output));
+                if (ex instanceof Map<?, ?>) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> exampleMap = (Map<String, Object>) ex;
+                    
+                    // Get values directly using the exact keys we expect
+                    String userInput = "";
+                    String expectedOutput = "";
+                    
+                    if (exampleMap.containsKey("User Input") && exampleMap.get("User Input") != null) {
+                        userInput = exampleMap.get("User Input").toString();
+                    }
+                    
+                    if (exampleMap.containsKey("Expected Output") && exampleMap.get("Expected Output") != null) {
+                        expectedOutput = exampleMap.get("Expected Output").toString();
+                    }
+                    
+                    // Create the processed example
+                    Map<String, String> processedExample = new HashMap<>();
+                    processedExample.put("User Input", userInput);
+                    processedExample.put("Expected Output", expectedOutput);
+                    
+                    processed.add(processedExample);
                 }
             }
         }
+        
         return processed;
     }
 
@@ -193,9 +207,13 @@ public class BitbucketService {
         String department = payload.get("department").toString();
         String appCode = payload.get("appCode").toString();
         String instructions = payload.getOrDefault("instructions", "").toString();
+        
+        // Debug logging for examples
+        System.out.println("Raw examples from payload: " + payload.get("examples"));
         Object examplesObj = payload.get("examples");
-
         List<Map<String, String>> processedExamples = processExamples(examplesObj);
+        System.out.println("Processed examples: " + processedExamples);
+
         String fileName = name.replaceAll("\\s+", "-") + ".json";
         String filePath = department + "/" + appCode + "/" + fileName;
 
@@ -223,12 +241,20 @@ public class BitbucketService {
         ObjectNode fileContent = objectMapper.createObjectNode();
         fileContent.put("Main Prompt Content", content);
         fileContent.put("Additional Instructions", instructions);
-        fileContent.set("Examples", objectMapper.valueToTree(processedExamples));
+        
+        // Debug logging for file content
+        System.out.println("Creating file content with examples: " + processedExamples);
+        ArrayNode examplesNode = objectMapper.valueToTree(processedExamples);
+        fileContent.set("Examples", examplesNode);
+
+        // Debug logging for final JSON
+        String finalJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(fileContent);
+        System.out.println("Final JSON to be committed: " + finalJson);
 
         // Commit to Bitbucket
         Map<String, String> files = Map.of(
                 "metadata.json", objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(metadataArray),
-                filePath, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(fileContent));
+                filePath, finalJson);
         commitFiles("Creating new template: " + name + " in " + department + "/" + appCode, files);
 
         // Build response

@@ -23,6 +23,22 @@ import BusinessIcon from "@mui/icons-material/Business";
 import HistoryIcon from "@mui/icons-material/History";
 import PersonIcon from "@mui/icons-material/Person";
 
+type ExampleType = { "User Input": string; "Expected Output": string };
+
+function normalizeExamples(examples: any): ExampleType[] {
+  if (!Array.isArray(examples)) return [];
+  return examples.map((ex) => {
+    if ("User Input" in ex && "Expected Output" in ex) return ex;
+    if ("userInput" in ex || "expectedOutput" in ex) {
+      return {
+        "User Input": ex.userInput ?? "",
+        "Expected Output": ex.expectedOutput ?? "",
+      };
+    }
+    return { "User Input": "", "Expected Output": "" };
+  });
+}
+
 const ViewTemplate: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [template, setTemplate] = useState<Template | null>(null);
@@ -162,7 +178,7 @@ const ViewTemplate: React.FC = () => {
                   <Typography variant="h6" gutterBottom>
                     Examples
                   </Typography>
-                  {template.examples.map((example, index) => (
+                  {normalizeExamples(template.examples).map((example, index) => (
                     <Paper key={index} sx={{ p: 2, mb: 2, bgcolor: "grey.50" }}>
                       <Typography variant="subtitle1" gutterBottom>
                         Example {index + 1}

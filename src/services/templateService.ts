@@ -98,8 +98,8 @@ export async function createTemplate(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...data,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
     }),
   });
 
