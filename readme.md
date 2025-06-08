@@ -16,6 +16,7 @@ BITBUCKET_WORKSPACE=debugging-dragons
 BITBUCKET_REPO=prompt-template
 BITBUCKET_USERNAME=
 BITBUCKET_APP_PASSWORD=
+BITBUCKET_BASE_URL=https://bitbucket.org
 
 # Create an App password
 
